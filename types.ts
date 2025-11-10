@@ -7,6 +7,8 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   genre_ids?: number[];
+  runtime?: number;
+  genres?: Array<{ id: number; name: string }>;
 }
 
 export interface TVSeries {
@@ -18,6 +20,21 @@ export interface TVSeries {
   first_air_date: string;
   vote_average: number;
   genre_ids?: number[];
+  episode_run_time?: number[];
+  genres?: Array<{ id: number; name: string }>;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  token: string;
+}
+
+export interface AuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
 }
 
 export interface MovieContextType {
@@ -25,23 +42,31 @@ export interface MovieContextType {
   tvSeries: TVSeries[];
   title: string;
   trailerUrl: string | null;
-  fetchPopularMovies: () => void;
-  fetchTopRatedMovies: () => void;
-  fetchUpcomingMovies: () => void;
-  fetchFeaturedMovies: () => void;
-  fetchAnimeMovies: () => void;
-  searchMovies: (query: string) => void;
-  fetchPopularTvSeries: () => void;
-  fetchAiringTodayTvSeries: () => void;
-  fetchOnTheAirTvSeries: () => void;
-  fetchTopRatedTvSeries: () => void;
-  fetchMoviesByGenre: (genreId: number) => void;
-  fetchTrailer: (id: number, type: 'movie' | 'tv') => void;
+  isLoading: boolean;
+  fetchPopularMovies: () => Promise<void>;
+  fetchTopRatedMovies: () => Promise<void>;
+  fetchUpcomingMovies: () => Promise<void>;
+  fetchFeaturedMovies: () => Promise<void>;
+  fetchAnimeMovies: () => Promise<void>;
+  searchMovies: (query: string) => Promise<void>;
+  fetchPopularTvSeries: () => Promise<void>;
+  fetchAiringTodayTvSeries: () => Promise<void>;
+  fetchOnTheAirTvSeries: () => Promise<void>;
+  fetchTopRatedTvSeries: () => Promise<void>;
+  fetchMoviesByGenre: (genreId: number) => Promise<void>;
+  fetchTrailer: (id: number, type: 'movie' | 'tv') => Promise<void>;
   setTrailerUrl: (url: string | null) => void;
 }
 
 export interface AuthContextType {
-  user: any;
-  login: (token: string) => void;
-  logout: () => void;
+  user: User | null;
+  isLoading: boolean;
+  login: (email: string, password?: string) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<AuthResult>;
+}
+
+export interface Genre {
+  id: number;
+  name: string;
 }

@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useMovieContext } from '../context/MovieContext';
 import { Movie, TVSeries } from '../types';
+import TrailerModal from './TrailerModal';
 
 interface MovieCardProps {
   item: Movie | TVSeries;
@@ -14,14 +15,16 @@ interface MovieCardProps {
 
 const MovieCard: React.FC<MovieCardProps> = ({ item, type, onPress }) => {
   const { user } = useAuth();
-  const { fetchTrailer } = useMovieContext();
+  const { fetchTrailer, trailerUrl, setTrailerUrl } = useMovieContext();
   const router = useRouter();
   const [scaleValue] = useState(new Animated.Value(1));
   const [isHovered, setIsHovered] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
 
   const title = 'title' in item ? item.title : item.name;
   const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-  const year = new Date(releaseDate).getFullYear();
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
 
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
@@ -63,12 +66,28 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onPress }) => {
     }
   };
 
-  const handleWatchTrailer = (e: any) => {
+  const handleWatchTrailer = async (e: any) => {
     e.stopPropagation();
-    if (user) {
-      fetchTrailer(item.id, type);
-    } else {
-      router.push('/login');
+    
+    if (isLoadingTrailer) return;
+
+    try {
+      setIsLoadingTrailer(true);
+      await fetchTrailer(item.id, type);
+      
+      // Wait a bit for the trailer URL to be set
+      setTimeout(() => {
+        if (trailerUrl) {
+          setShowTrailer(true);
+        } else {
+          Alert.alert('No Trailer', 'Trailer not available for this content');
+        }
+        setIsLoadingTrailer(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error fetching trailer:', error);
+      Alert.alert('Error', 'Failed to load trailer');
+      setIsLoadingTrailer(false);
     }
   };
 
@@ -77,101 +96,131 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onPress }) => {
     if (user) {
       router.push(`/movie/${item.id}?watch=true` as any);
     } else {
-      router.push('/login');
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to watch movies and TV shows',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
     }
   };
 
+  const handleCloseTrailer = () => {
+    setShowTrailer(false);
+    setTrailerUrl(null);
+  };
+
+  const posterUrl = item.poster_path 
+    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+    : 'https://via.placeholder.com/500x750/333/fff?text=No+Poster';
+
   return (
-    <TouchableOpacity
-      onPress={handlePress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-      {...(Platform.OS === 'web' ? {
-        onMouseEnter: handleHoverIn,
-        onMouseLeave: handleHoverOut,
-      } : {})}
-    >
-      <Animated.View style={[styles.card, { transform: [{ scale: scaleValue }] }]}>
-        <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }} 
-            style={styles.poster} 
-          />
-          
-          {/* Hover overlay with movie info */}
-          <Animated.View style={[
-            styles.hoverOverlay, 
-            { opacity: isHovered ? 1 : 0 }
-          ]}>
-            <View style={styles.movieInfo}>
-              <Text style={styles.hoverTitle} numberOfLines={2}>
-                {title}
-              </Text>
-              <Text style={styles.hoverYear}>{year}</Text>
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#f59e0b" />
-                <Text style={styles.hoverRating}>
-                  {item.vote_average.toFixed(1)}
+    <>
+      <TouchableOpacity
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        {...(Platform.OS === 'web' ? {
+          onMouseEnter: handleHoverIn,
+          onMouseLeave: handleHoverOut,
+        } : {})}
+      >
+        <Animated.View style={[styles.card, { transform: [{ scale: scaleValue }] }]}>
+          <View style={styles.imageContainer}>
+            <Image 
+              source={{ uri: posterUrl }} 
+              style={styles.poster}
+              resizeMode="cover"
+            />
+            
+            {/* Hover overlay with movie info */}
+            <Animated.View style={[
+              styles.hoverOverlay, 
+              { opacity: isHovered ? 1 : 0 }
+            ]}>
+              <View style={styles.movieInfo}>
+                <Text style={styles.hoverTitle} numberOfLines={2}>
+                  {title}
                 </Text>
-              </View>
-              <Text style={styles.hoverOverview} numberOfLines={3}>
-                {item.overview}
-              </Text>
-              
-              {/* Action buttons */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity 
-                  style={styles.trailerButton} 
-                  onPress={handleWatchTrailer}
-                >
-                  <Ionicons name="play" size={16} color="#fff" />
-                  <Text style={styles.buttonText}>Trailer</Text>
-                </TouchableOpacity>
+                <Text style={styles.hoverYear}>{year}</Text>
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={14} color="#f59e0b" />
+                  <Text style={styles.hoverRating}>
+                    {item.vote_average.toFixed(1)}
+                  </Text>
+                </View>
+                <Text style={styles.hoverOverview} numberOfLines={3}>
+                  {item.overview || 'No overview available.'}
+                </Text>
                 
-                {user && (
+                {/* Action buttons */}
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity 
+                    style={[styles.trailerButton, isLoadingTrailer && styles.disabledButton]} 
+                    onPress={handleWatchTrailer}
+                    disabled={isLoadingTrailer}
+                  >
+                    {isLoadingTrailer ? (
+                      <Text style={styles.buttonText}>Loading...</Text>
+                    ) : (
+                      <>
+                        <Ionicons name="play" size={16} color="#fff" />
+                        <Text style={styles.buttonText}>Trailer</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  
                   <TouchableOpacity 
                     style={styles.watchButton} 
                     onPress={handleWatchMovie}
                   >
                     <Ionicons name="play-circle" size={16} color="#000" />
-                    <Text style={styles.watchButtonText}>Watch</Text>
+                    <Text style={styles.watchButtonText}>
+                      {user ? 'Watch' : 'Sign In'}
+                    </Text>
                   </TouchableOpacity>
-                )}
+                </View>
+              </View>
+            </Animated.View>
+
+            <View style={styles.yearBadge}>
+              <Text style={styles.yearText}>{year}</Text>
+            </View>
+
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={12} color="#f59e0b" />
+              <Text style={styles.ratingBadgeText}>
+                {item.vote_average.toFixed(1)}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.info}>
+            <Text style={styles.title} numberOfLines={2}>
+              {title}
+            </Text>
+            <View style={styles.genreContainer}>
+              <Text style={styles.genre}>
+                {type === 'movie' ? 'Movie' : 'TV Series'}
+              </Text>
+              <View style={styles.hdBadge}>
+                <Text style={styles.hdText}>HD</Text>
               </View>
             </View>
-          </Animated.View>
-
-          {/* Play button overlay */}
-          <Animated.View style={[
-            styles.overlay,
-            { opacity: isHovered ? 1 : 0 }
-          ]}>
-            <TouchableOpacity style={styles.playButton} onPress={handleWatchTrailer}>
-              <Text style={styles.playIcon}>▶</Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <View style={styles.yearBadge}>
-            <Text style={styles.yearText}>{year}</Text>
           </View>
-        </View>
-        
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.rating}>
-              {item.vote_average.toFixed(1)}/10
-            </Text>
-            <View style={styles.hdBadge}>
-              <Text style={styles.hdText}>HD</Text>
-            </View>
-          </View>
-        </View>
-      </Animated.View>
-    </TouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/* Trailer Modal */}
+      <TrailerModal
+        visible={showTrailer}
+        trailerKey={trailerUrl}
+        onClose={handleCloseTrailer}
+      />
+    </>
   );
 };
 
@@ -196,14 +245,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 300,
     borderRadius: 12,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-    zIndex: 2,
   },
   hoverOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -271,6 +312,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   buttonText: {
     color: '#ffffff',
     fontSize: 12,
@@ -281,20 +325,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
-  },
-  playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(6, 182, 212, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playIcon: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
     marginLeft: 4,
   },
   yearBadge: {
@@ -309,8 +339,26 @@ const styles = StyleSheet.create({
   },
   yearText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  ratingBadgeText: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginLeft: 2,
   },
   info: {
     paddingTop: 12,
@@ -322,16 +370,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
+    lineHeight: 18,
   },
-  ratingContainer: {
+  genreContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rating: {
-    color: '#f59e0b',
-    fontSize: 12,
-    fontWeight: '600',
+  genre: {
+    color: '#888',
+    fontSize: 11,
     marginRight: 8,
   },
   hdBadge: {

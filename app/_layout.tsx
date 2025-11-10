@@ -2,16 +2,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Slot } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { AuthProvider } from '../context/AuthContext';
+import { MovieProvider } from '../context/MovieContext';
 
 const AppLayout = () => {
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#0A0F28', '#1A213E', '#2C3A5B']}
-        style={styles.gradient}
-      />
-      <Slot />
-    </View>
+    <AuthProvider>
+      <MovieProvider>
+        <View style={styles.container}>
+          <LinearGradient
+            colors={['#0A0F28', '#1A213E', '#2C3A5B']}
+            style={styles.gradient}
+          />
+          <Slot />
+        </View>
+      </MovieProvider>
+    </AuthProvider>
   );
 };
 
