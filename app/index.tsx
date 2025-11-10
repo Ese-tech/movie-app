@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -10,7 +11,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useRouter } from 'expo-router';
 
 // Mock data structure for movies
 interface Movie {
