@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import MovieCard from './MovieCard';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Movie } from '../types';
+import MovieCard from './MovieCard';
 
 interface MovieGridSectionProps {
   title: string;

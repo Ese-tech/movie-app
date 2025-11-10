@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
-import { useMovieContext } from '../context/MovieContext';
-import Navigation from '../components/navigation';
-import MovieCard from '../components/MovieCard';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import MovieCard from '../components/MovieCard';
+import Navigation from '../components/navigation';
+import { useMovieContext } from '../context/MovieContext';
 import { Movie, TVSeries } from '../types';
 
 const MoviesPage = () => {

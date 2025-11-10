@@ -1,5 +1,5 @@
+import { API_BASE_URL as ENV_API_BASE_URL, JWT_SECRET as ENV_JWT_SECRET, MONGODB_URI as ENV_MONGODB_URI, TMDB_API_KEY as ENV_TMDB_API_KEY } from '@env';
 import Constants from 'expo-constants';
-import { TMDB_API_KEY as ENV_TMDB_API_KEY, MONGODB_URI as ENV_MONGODB_URI, JWT_SECRET as ENV_JWT_SECRET, API_BASE_URL as ENV_API_BASE_URL } from '@env';
 
 // Central config helper used across the app.
 // It first attempts to read values from expo config extra (recommended for Expo/EAS),

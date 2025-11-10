@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity,
-  Image,
-  FlatList,
-  ActivityIndicator
-} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { useRouter } from 'expo-router';
 
 // Mock data structure for movies
 interface Movie {
@@ -25,6 +26,7 @@ interface Movie {
 const Home = () => {
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     loadMovies();
@@ -104,8 +106,11 @@ const Home = () => {
       {/* Netflix Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>NETFLIX</Text>
-        <TouchableOpacity style={styles.profileButton}>
-          <Text style={styles.profileText}>Profil</Text>
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => router.push('/login')}
+        >
+          <Text style={styles.profileText}>Anmelden</Text>
         </TouchableOpacity>
       </View>
 

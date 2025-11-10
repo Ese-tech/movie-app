@@ -1,10 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
-import { Movie, TVSeries } from '../types';
+import { Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useMovieContext } from '../context/MovieContext';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Movie, TVSeries } from '../types';
 
 interface MovieCardProps {
   item: Movie | TVSeries;

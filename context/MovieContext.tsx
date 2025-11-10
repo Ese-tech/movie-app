@@ -1,19 +1,19 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, ReactNode, useContext, useState } from 'react';
+import { Movie, MovieContextType, TVSeries } from '../types';
 import {
-  getPopularMovies,
-  getTopRatedMovies,
-  getUpcomingMovies,
-  searchMovies,
-  getFeaturedMovies,
-  getAnimeMovies,
-  getPopularTvSeries,
-  getAiringTodayTvSeries,
-  getOnTheAirTvSeries,
-  getTopRatedTvSeries,
-  getMoviesByGenre,
-  getTrailer,
+    getAiringTodayTvSeries,
+    getAnimeMovies,
+    getFeaturedMovies,
+    getMoviesByGenre,
+    getOnTheAirTvSeries,
+    getPopularMovies,
+    getPopularTvSeries,
+    getTopRatedMovies,
+    getTopRatedTvSeries,
+    getTrailer,
+    getUpcomingMovies,
+    searchMovies,
 } from '../utils/api';
-import { Movie, TVSeries, MovieContextType } from '../types';
 
 const MovieContext = createContext<MovieContextType | undefined>(undefined);
 

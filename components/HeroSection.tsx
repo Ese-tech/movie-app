@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getFeaturedMovies } from '../utils/api';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Movie } from '../types';
+import { getFeaturedMovies } from '../utils/api';
 
 const { width } = Dimensions.get('window');
 

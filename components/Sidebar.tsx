@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { getPopularMovies, getUpcomingMovies } from '../utils/api';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Movie } from '../types';
+import { getPopularMovies, getUpcomingMovies } from '../utils/api';
 
 interface SidebarProps {
   onMovieSelect?: (movie: Movie) => void;
