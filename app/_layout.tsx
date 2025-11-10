@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AuthProvider } from '../context/AuthContext';
@@ -14,7 +14,12 @@ const AppLayout = () => {
             colors={['#0A0F28', '#1A213E', '#2C3A5B']}
             style={styles.gradient}
           />
-          <Slot />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="movie/[id]" />
+          </Stack>
         </View>
       </MovieProvider>
     </AuthProvider>
