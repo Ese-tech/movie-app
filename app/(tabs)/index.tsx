@@ -1,192 +1,379 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ScrollView, ImageBackground, Animated } from 'react-native';
-import { useMovieContext } from '../../context/MovieContext';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { getTopRatedMovies } from '../../utils/api';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, ImageBackground, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { fetchPopularMovies, fetchTopRatedMovies, fetchTrendingMovies, Movie } from '../../api/tmdb';
+import MovieCard from '../../components/MovieCard';
+import { useAuth } from '../../context/AuthContext';
 
-const Home = () => {
-  const { movies, fetchPopularMovies, fetchUpcomingMovies } = useMovieContext();
-  const [topRated, setTopRated] = useState([]);
-  const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
-  const [hoveredMovieId, setHoveredMovieId] = useState(null);
+export default function HomeScreen() {
+  const { isLoggedIn } = useAuth();
   const router = useRouter();
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  
+  const [trendingMovies, setTrendingMovies] = useState<Movie[]>([]);
+  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
+  const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
+  const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPopularMovies();
-    fetchUpcomingMovies();
-    const fetchTopRated = async () => {
-      const topRatedMovies = await getTopRatedMovies();
-      setTopRated(topRatedMovies.slice(0, 5));
-    };
-    fetchTopRated();
+    loadMovieData();
   }, []);
 
-  useEffect(() => {
-    if (movies.length > 0) {
-      const interval = setInterval(() => {
-        fadeOut(() => {
-          setCurrentMovieIndex((prevIndex) => (prevIndex + 1) % 5);
-          fadeIn();
-        });
-      }, 5000);
-      return () => clearInterval(interval);
+  const loadMovieData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [trendingData, popularData, topRatedData] = await Promise.all([
+        fetchTrendingMovies(),
+        fetchPopularMovies(),
+        fetchTopRatedMovies()
+      ]);
+
+      setTrendingMovies(trendingData.results.slice(0, 10));
+      setPopularMovies(popularData.results.slice(0, 10));
+      setTopRatedMovies(topRatedData.results.slice(0, 10));
+      
+      // Set the first trending movie as featured
+      if (trendingData.results.length > 0) {
+        setFeaturedMovie(trendingData.results[0]);
+      }
+
+    } catch (err) {
+      console.error('Error loading movie data:', err);
+      setError('Failed to load movies. Please check your internet connection.');
+    } finally {
+      setLoading(false);
     }
-  }, [movies]);
-
-  const fadeOut = (callback) => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(callback);
   };
 
-  const fadeIn = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+  const handleMoviePress = (movie: Movie) => {
+    // Navigate to movie details modal
+    router.push('/modal');
   };
 
-  const renderMovie = ({ item }) => (
-    <View
-      style={styles.movieContainer}
-      onMouseEnter={() => setHoveredMovieId(item.id)}
-      onMouseLeave={() => setHoveredMovieId(null)}
-    >
-      <TouchableOpacity onPress={() => router.push(`/movie/${item.id}`)}>
-        <Image source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }} style={styles.poster} />
-        {hoveredMovieId === item.id && (
-          <View style={styles.overlay}>
-            <TouchableOpacity onPress={() => router.push(`/movie/${item.id}`)} style={styles.playButton}>
-              <Text style={styles.playButtonText}>▶</Text>
-            </TouchableOpacity>
-            <Text style={styles.overlayTitle}>{item.title}</Text>
-            <Text style={styles.overlayInfo}>{(item.vote_average || 0).toFixed(1)}/10</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-      <Text style={styles.movieTitle}>{item.title}</Text>
+  const handleWatchTrailer = (movie: Movie) => {
+    Alert.alert('Watch Trailer', `Playing trailer for ${movie.title}`);
+  };
+
+  const handleWatchMovie = (movie: Movie) => {
+    if (isLoggedIn) {
+      Alert.alert('Watch Movie', `Streaming ${movie.title}`);
+    } else {
+      Alert.alert('Login Required', 'Please sign in to watch movies');
+    }
+  };
+
+  const handleAddToWatchlist = (movie: Movie) => {
+    Alert.alert('Watchlist', `Added ${movie.title} to your watchlist`);
+  };
+
+  const convertToMovieCardFormat = (movie: Movie) => ({
+    id: movie.id,
+    title: movie.title,
+    vote_average: movie.vote_average,
+    year: movie.release_date ? new Date(movie.release_date).getFullYear() : undefined,
+    overview: movie.overview,
+    poster_path: movie.poster_path
+  });
+
+  const renderMovieCard = ({ item }: { item: Movie }) => (
+    <MovieCard
+      movie={convertToMovieCardFormat(item)}
+      onPress={() => handleMoviePress(item)}
+      onWatchTrailer={() => handleWatchTrailer(item)}
+      onWatchMovie={() => handleWatchMovie(item)}
+      onAddToWatchlist={() => handleAddToWatchlist(item)}
+    />
+  );
+
+  const renderMovieRow = (title: string, movies: Movie[]) => (
+    <View style={styles.movieRow}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <FlatList
+        horizontal
+        data={movies}
+        renderItem={renderMovieCard}
+        keyExtractor={(item) => item.id.toString()}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.movieList}
+      />
     </View>
   );
 
-  const renderTopRatedMovie = ({ item, index }) => (
-    <TouchableOpacity onPress={() => router.push(`/movie/${item.id}`)} style={styles.topRatedContainer}>
-      <Text style={styles.topRatedNumber}>#{index + 1}</Text>
-      <Image source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }} style={styles.topRatedPoster} />
-      <View style={styles.topRatedDetails}>
-        <Text style={styles.topRatedTitle}>{item.title}</Text>
-        <Text style={styles.topRatedExtra}>{(item.vote_average || 0).toFixed(1)}/10 {item.release_date?.split('-')[0]}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const currentMovie = movies[currentMovieIndex];
-
   return (
-    <ScrollView style={styles.container}>
-      {currentMovie && (
-        <Animated.View style={{ opacity: fadeAnim }}>
-          <ImageBackground
-            source={{ uri: `https://image.tmdb.org/t/p/original${currentMovie.backdrop_path}` }}
-            style={styles.heroContainer}
-          >
-            <View style={styles.heroOverlay} />
-            <Text style={styles.heroTitle}>{currentMovie.title}</Text>
-            <Text style={styles.heroDescription}>{currentMovie.overview}</Text>
-            <TouchableOpacity style={styles.watchButton} onPress={() => router.push(`/movie/${currentMovie.id}`)}>
-              <Text style={styles.watchButtonText}>Watch Movie</Text>
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={['#0a0a0a', '#1a1a1a', '#0a2a1a']}
+        style={StyleSheet.absoluteFillObject}
+      />
+      
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00d4aa" />
+            <Text style={styles.loadingText}>Loading movies...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadMovieData}>
+              <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
-          </ImageBackground>
-        </Animated.View>
-      )}
-
-      <View style={styles.mainContent}>
-        <View style={styles.leftColumn}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Movies</Text>
-            <FlatList
-              data={movies.slice(0, 10)}
-              renderItem={renderMovie}
-              keyExtractor={(item) => item.id.toString()}
-              numColumns={5}
-              columnWrapperStyle={{ justifyContent: 'space-between' }}
-            />
           </View>
-        </View>
+        ) : (
+          <>
+            {/* Featured Movie Section */}
+            {featuredMovie && (
+              <View style={styles.featuredSection}>
+                <ImageBackground
+                  source={{ uri: `https://image.tmdb.org/t/p/original${featuredMovie.backdrop_path || featuredMovie.poster_path}` }}
+                  style={styles.featuredBackground}
+                  resizeMode="cover"
+                >
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(10,10,10,1)']}
+                    style={styles.featuredGradient}
+                  >
+                    <View style={styles.featuredContent}>
+                      <View style={styles.featuredBadge}>
+                        <Text style={styles.featuredBadgeText}>MOVIE</Text>
+                      </View>
+                      <Text style={styles.featuredTitle}>{featuredMovie.title}</Text>
+                      <View style={styles.featuredMeta}>
+                        <Text style={styles.featuredRating}>
+                          ⭐ {featuredMovie.vote_average.toFixed(1)}/10
+                        </Text>
+                        <Text style={styles.featuredYear}>
+                          {new Date(featuredMovie.release_date).getFullYear()}
+                        </Text>
+                        <View style={styles.ratingBadge}>
+                          <Text style={styles.ratingBadgeText}>HD</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.featuredOverview} numberOfLines={3}>
+                        {featuredMovie.overview}
+                      </Text>
+                      <View style={styles.featuredButtons}>
+                        <TouchableOpacity 
+                          style={styles.playButton}
+                          onPress={() => handleWatchMovie(featuredMovie)}
+                        >
+                          <Ionicons name="play" size={20} color="#000000" />
+                          <Text style={styles.playButtonText}>Watch Movie</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.infoButton}
+                          onPress={() => handleMoviePress(featuredMovie)}
+                        >
+                          <Ionicons name="information-circle" size={20} color="#FFD700" />
+                          <Text style={styles.infoButtonText}>More Info</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </ImageBackground>
+              </View>
+            )}
 
-        <View style={styles.rightColumn}>
-          <View style={styles.sideSection}>
-            <Text style={styles.sideSectionTitle}>Most Viewed</Text>
-            <FlatList
-              data={topRated}
-              renderItem={renderTopRatedMovie}
-              keyExtractor={(item) => item.id.toString()}
-            />
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+            <View style={styles.sectionsContainer}>
+              {renderMovieRow("🔥 Trending Now", trendingMovies)}
+              {renderMovieRow("⭐ Popular Movies", popularMovies)}
+              {renderMovieRow("🏆 Top Rated", topRatedMovies)}
+            </View>
+          </>
+        )}
+        
+        <View style={{ height: 120 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0F28' },
-  heroContainer: { height: 500, justifyContent: 'center', paddingHorizontal: 40 },
-  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
-  heroTitle: { color: '#fff', fontSize: 48, fontWeight: 'bold', marginBottom: 10 },
-  heroDescription: { color: '#fff', fontSize: 16, width: '60%', marginBottom: 20 },
-  watchButton: { backgroundColor: '#00bfff', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, width: 150, alignItems: 'center' },
-  watchButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  mainContent: { flexDirection: 'row', padding: 20 },
-  leftColumn: { flex: 3, marginRight: 20 },
-  rightColumn: { flex: 1 },
-  section: { marginBottom: 30 },
-  sectionTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  movieContainer: { flex: 1, maxWidth: '18%', marginBottom: 20, position: 'relative' },
-  poster: { width: '100%', height: 250, borderRadius: 10 },
-  movieTitle: { color: '#fff', marginTop: 8, textAlign: 'center', fontSize: 14 },
-  sideSection: { marginBottom: 30 },
-  sideSectionTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#1A213E', paddingBottom: 10 },
-  topRatedContainer: { flexDirection: 'row', marginBottom: 15, alignItems: 'center' },
-  topRatedNumber: { color: '#00bfff', fontSize: 24, fontWeight: 'bold', marginRight: 10 },
-  topRatedPoster: { width: 60, height: 90, borderRadius: 5 },
-  topRatedDetails: { marginLeft: 10, flex: 1 },
-  topRatedTitle: { color: '#fff', fontSize: 16 },
-  topRatedExtra: { color: '#888', fontSize: 12, marginTop: 4 },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 10,
-    justifyContent: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+  },
+  content: {
+    flex: 1,
+  },
+  featuredSection: {
+    height: 500,
+    position: 'relative',
+  },
+  featuredBackground: {
+    width: '100%',
+    height: '100%',
+  },
+  featuredGradient: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  featuredContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  featuredBadge: {
+    backgroundColor: '#00d4aa',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 15,
+  },
+  featuredBadgeText: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  featuredTitle: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  featuredMeta: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 15,
+    gap: 15,
+  },
+  featuredRating: {
+    color: '#FFD700',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  featuredYear: {
+    color: '#CCCCCC',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  ratingBadge: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  ratingBadgeText: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  featuredOverview: {
+    color: '#DDDDDD',
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 25,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  featuredButtons: {
+    flexDirection: 'row',
+    gap: 15,
   },
   playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
+    backgroundColor: '#00d4aa',
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    shadowColor: '#00d4aa',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   playButtonText: {
-    fontSize: 30,
-    color: '#000',
-  },
-  overlayTitle: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 10,
-    textAlign: 'center',
+    marginLeft: 8,
   },
-  overlayInfo: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 5,
+  infoButton: {
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  infoButtonText: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  sectionsContainer: {
+    paddingTop: 20,
+  },
+  movieRow: {
+    marginTop: 35,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 212, 170, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  movieList: {
+    paddingLeft: 20,
+    paddingRight: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 15,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 25,
+  },
+  retryButton: {
+    backgroundColor: '#00d4aa',
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
-
-export default Home;

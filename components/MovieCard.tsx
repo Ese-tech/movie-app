@@ -1,398 +1,386 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Animated, Dimensions, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { fetchMovieVideos, fetchTVShowVideos, getPosterUrl } from '../api/tmdb';
 import { useAuth } from '../context/AuthContext';
-import { useMovieContext } from '../context/MovieContext';
-import { Movie, TVSeries } from '../types';
-import TrailerModal from './TrailerModal';
 
-interface MovieCardProps {
-  item: Movie | TVSeries;
-  type: 'movie' | 'tv';
-  onPress?: () => void;
+interface Movie {
+  id: number;
+  title?: string;
+  name?: string;
+  vote_average: number;
+  year?: number;
+  genre?: string;
+  overview?: string;
+  poster_path?: string;
+  release_date?: string;
+  first_air_date?: string;
+  isTV?: boolean;
 }
 
-const MovieCard: React.FC<MovieCardProps> = ({ item, type, onPress }) => {
-  const { user } = useAuth();
-  const { fetchTrailer, trailerUrl, setTrailerUrl } = useMovieContext();
-  const router = useRouter();
-  const [scaleValue] = useState(new Animated.Value(1));
-  const [isHovered, setIsHovered] = useState(false);
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
+interface MovieCardProps {
+  movie: Movie;
+  onPress?: () => void;
+  onWatchTrailer?: () => void;
+  onWatchMovie?: () => void;
+  onAddToWatchlist?: () => void;
+}
 
-  const title = 'title' in item ? item.title : item.name;
-  const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-  const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 80) / 2.5;
+
+export default function MovieCard({ 
+  movie, 
+  onPress, 
+  onWatchTrailer, 
+  onWatchMovie, 
+  onAddToWatchlist 
+}: MovieCardProps) {
+  const { isLoggedIn } = useAuth();
+  const [isPressed, setIsPressed] = useState(false);
+  const [showHover, setShowHover] = useState(false);
+  const scaleAnim = new Animated.Value(1);
 
   const handlePressIn = () => {
-    Animated.spring(scaleValue, {
-      toValue: 0.95,
-      useNativeDriver: true,
-      speed: 50,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 50,
-    }).start();
-  };
-
-  const handleHoverIn = () => {
-    setIsHovered(true);
-    Animated.spring(scaleValue, {
+    setIsPressed(true);
+    setShowHover(true);
+    Animated.spring(scaleAnim, {
       toValue: 1.05,
       useNativeDriver: true,
     }).start();
   };
 
-  const handleHoverOut = () => {
-    setIsHovered(false);
-    Animated.spring(scaleValue, {
+  const handlePressOut = () => {
+    setIsPressed(false);
+    setTimeout(() => setShowHover(false), 200);
+    Animated.spring(scaleAnim, {
       toValue: 1,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePress = () => {
-    if (onPress) {
-      onPress();
-    } else {
-      router.push(`/movie/${item.id}` as any);
-    }
+    onPress?.();
   };
 
   const handleWatchTrailer = async (e: any) => {
     e.stopPropagation();
-    
-    if (isLoadingTrailer) return;
-
     try {
-      setIsLoadingTrailer(true);
-      await fetchTrailer(item.id, type);
+      // Fetch trailer from TMDB
+      const videosResponse = movie.isTV 
+        ? await fetchTVShowVideos(movie.id)
+        : await fetchMovieVideos(movie.id);
       
-      // Wait a bit for the trailer URL to be set
-      setTimeout(() => {
-        if (trailerUrl) {
-          setShowTrailer(true);
+      const trailer = videosResponse.results.find(
+        video => video.type === 'Trailer' && video.site === 'YouTube'
+      );
+      
+      if (trailer) {
+        const youtubeUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+        const canOpen = await Linking.canOpenURL(youtubeUrl);
+        if (canOpen) {
+          await Linking.openURL(youtubeUrl);
         } else {
-          Alert.alert('No Trailer', 'Trailer not available for this content');
+          Alert.alert('Error', 'Cannot open YouTube');
         }
-        setIsLoadingTrailer(false);
-      }, 1000);
+      } else {
+        Alert.alert('No Trailer', 'No trailer available for this movie');
+      }
     } catch (error) {
       console.error('Error fetching trailer:', error);
       Alert.alert('Error', 'Failed to load trailer');
-      setIsLoadingTrailer(false);
     }
+    
+    onWatchTrailer?.();
   };
 
   const handleWatchMovie = (e: any) => {
     e.stopPropagation();
-    if (user) {
-      router.push(`/movie/${item.id}?watch=true` as any);
+    if (isLoggedIn) {
+      onWatchMovie?.();
     } else {
       Alert.alert(
         'Sign In Required',
-        'Please sign in to watch movies and TV shows',
+        'Please sign in to watch movies',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
+          { text: 'Go to Profile', onPress: () => {} },
         ]
       );
     }
   };
 
-  const handleCloseTrailer = () => {
-    setShowTrailer(false);
-    setTrailerUrl(null);
+  const handleAddToWatchlist = (e: any) => {
+    e.stopPropagation();
+    onAddToWatchlist?.();
   };
 
-  const posterUrl = item.poster_path 
-    ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-    : 'https://via.placeholder.com/500x750/333/fff?text=No+Poster';
+  const movieTitle = movie.title || movie.name || 'Unknown Title';
+  const releaseYear = movie.year || (movie.release_date ? new Date(movie.release_date).getFullYear() : 
+                     movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : null);
 
   return (
-    <>
+    <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
+        style={styles.card}
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        activeOpacity={1}
-        {...(Platform.OS === 'web' ? {
-          onMouseEnter: handleHoverIn,
-          onMouseLeave: handleHoverOut,
-        } : {})}
+        activeOpacity={0.9}
       >
-        <Animated.View style={[styles.card, { transform: [{ scale: scaleValue }] }]}>
-          <View style={styles.imageContainer}>
-            <Image 
-              source={{ uri: posterUrl }} 
-              style={styles.poster}
+        <View style={styles.posterContainer}>
+          {movie.poster_path ? (
+            <Image
+              source={{ uri: getPosterUrl(movie.poster_path) }}
+              style={styles.posterImage}
               resizeMode="cover"
             />
-            
-            {/* Hover overlay with movie info */}
-            <Animated.View style={[
-              styles.hoverOverlay, 
-              { opacity: isHovered ? 1 : 0 }
-            ]}>
-              <View style={styles.movieInfo}>
-                <Text style={styles.hoverTitle} numberOfLines={2}>
-                  {title}
-                </Text>
-                <Text style={styles.hoverYear}>{year}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color="#f59e0b" />
-                  <Text style={styles.hoverRating}>
-                    {item.vote_average.toFixed(1)}
-                  </Text>
+          ) : (
+            <View style={styles.posterPlaceholder}>
+              <Text style={styles.posterText}>{movieTitle.substring(0, 8)}...</Text>
+            </View>
+          )}
+          
+          {/* Enhanced Hover Overlay with Movie Info */}
+          {showHover && (
+            <View style={styles.hoverOverlay}>
+              <View style={styles.hoverContent}>
+                <Text style={styles.hoverTitle} numberOfLines={2}>{movieTitle}</Text>
+                <View style={styles.hoverMeta}>
+                  <Text style={styles.hoverRating}>⭐ {movie.vote_average.toFixed(1)}</Text>
+                  {releaseYear && <Text style={styles.hoverYear}>{releaseYear}</Text>}
                 </View>
-                <Text style={styles.hoverOverview} numberOfLines={3}>
-                  {item.overview || 'No overview available.'}
-                </Text>
-                
-                {/* Action buttons */}
+                {movie.overview && (
+                  <Text style={styles.hoverOverview} numberOfLines={3}>
+                    {movie.overview}
+                  </Text>
+                )}
                 <View style={styles.actionButtons}>
                   <TouchableOpacity 
-                    style={[styles.trailerButton, isLoadingTrailer && styles.disabledButton]} 
+                    style={styles.trailerButton} 
                     onPress={handleWatchTrailer}
-                    disabled={isLoadingTrailer}
                   >
-                    {isLoadingTrailer ? (
-                      <Text style={styles.buttonText}>Loading...</Text>
-                    ) : (
-                      <>
-                        <Ionicons name="play" size={16} color="#fff" />
-                        <Text style={styles.buttonText}>Trailer</Text>
-                      </>
-                    )}
+                    <Ionicons name="play-circle" size={20} color="#000000" />
+                    <Text style={styles.trailerButtonText}>Trailer</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
                     style={styles.watchButton} 
                     onPress={handleWatchMovie}
                   >
-                    <Ionicons name="play-circle" size={16} color="#000" />
-                    <Text style={styles.watchButtonText}>
-                      {user ? 'Watch' : 'Sign In'}
-                    </Text>
+                    <Ionicons name="tv" size={20} color={isLoggedIn ? "#000000" : "#888888"} />
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton} 
+                    onPress={handleAddToWatchlist}
+                  >
+                    <Ionicons name="bookmark" size={20} color="#FFD700" />
                   </TouchableOpacity>
                 </View>
               </View>
-            </Animated.View>
+            </View>
+          )}
+        </View>
 
-            <View style={styles.yearBadge}>
-              <Text style={styles.yearText}>{year}</Text>
-            </View>
+        <View style={styles.movieInfo}>
+          <Text style={styles.movieTitle} numberOfLines={2}>
+            {movieTitle}
+          </Text>
+          <View style={styles.movieMeta}>
+            <Text style={styles.movieRating}>⭐ {movie.vote_average.toFixed(1)}</Text>
+            {releaseYear && <Text style={styles.movieYear}>{releaseYear}</Text>}
+          </View>
+          {movie.genre && (
+            <Text style={styles.movieGenre}>{movie.genre}</Text>
+          )}
+        </View>
 
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#f59e0b" />
-              <Text style={styles.ratingBadgeText}>
-                {item.vote_average.toFixed(1)}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.info}>
-            <Text style={styles.title} numberOfLines={2}>
-              {title}
-            </Text>
-            <View style={styles.genreContainer}>
-              <Text style={styles.genre}>
-                {type === 'movie' ? 'Movie' : 'TV Series'}
-              </Text>
-              <View style={styles.hdBadge}>
-                <Text style={styles.hdText}>HD</Text>
-              </View>
-            </View>
-          </View>
-        </Animated.View>
+        {/* Quick Action Trailer Button Always Visible */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity 
+            style={styles.quickTrailerButton}
+            onPress={handleWatchTrailer}
+          >
+            <Ionicons name="play" size={14} color="#000000" />
+            <Text style={styles.quickTrailerText}>Trailer</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
-
-      {/* Trailer Modal */}
-      <TrailerModal
-        visible={showTrailer}
-        trailerKey={trailerUrl}
-        onClose={handleCloseTrailer}
-      />
-    </>
+    </Animated.View>
   );
-};
+}
 
 const styles = StyleSheet.create({
+  container: {
+    width: cardWidth,
+    marginBottom: 25,
+    marginRight: 15,
+  },
   card: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     overflow: 'hidden',
-    marginHorizontal: 8,
-    marginVertical: 10,
-    width: 200,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 170, 0.2)',
+    shadowColor: '#00d4aa',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 4,
   },
-  imageContainer: {
+  posterContainer: {
     position: 'relative',
-  },
-  poster: {
     width: '100%',
-    height: 300,
-    borderRadius: 12,
+    height: 220,
+  },
+  posterImage: {
+    width: '100%',
+    height: '100%',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  posterPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  posterText: {
+    color: '#666666',
+    fontSize: 12,
+    textAlign: 'center',
   },
   hoverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    borderRadius: 12,
-    padding: 16,
-    justifyContent: 'space-between',
-    zIndex: 3,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
-  movieInfo: {
+  hoverContent: {
     flex: 1,
-    justifyContent: 'space-between',
+    padding: 15,
+    justifyContent: 'center',
   },
   hoverTitle: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  hoverYear: {
-    color: '#06b6d4',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  ratingRow: {
+  hoverMeta: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+    gap: 10,
   },
   hoverRating: {
-    color: '#f59e0b',
-    fontSize: 14,
+    color: '#FFD700',
+    fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+  },
+  hoverYear: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    fontWeight: '500',
   },
   hoverOverview: {
-    color: '#cccccc',
-    fontSize: 12,
+    color: '#CCCCCC',
+    fontSize: 11,
+    textAlign: 'center',
     lineHeight: 16,
-    marginBottom: 16,
+    marginBottom: 15,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
   trailerButton: {
+    backgroundColor: '#FFD700',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 15,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    flex: 1,
-    marginRight: 8,
-    justifyContent: 'center',
+    borderRadius: 20,
+    gap: 5,
+  },
+  trailerButtonText: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   watchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f59e0b',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#00d4aa',
+    padding: 10,
+    borderRadius: 20,
   },
-  disabledButton: {
-    opacity: 0.6,
+  actionButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 12,
+  movieInfo: {
+    padding: 15,
+  },
+  movieTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
-    marginLeft: 4,
-  },
-  watchButtonText: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  yearBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#06b6d4',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    zIndex: 1,
-  },
-  yearText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  ratingBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  ratingBadgeText: {
-    color: '#f59e0b',
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginLeft: 2,
-  },
-  info: {
-    paddingTop: 12,
-    paddingHorizontal: 4,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    lineHeight: 20,
     marginBottom: 8,
-    textAlign: 'center',
-    lineHeight: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
-  genreContainer: {
+  movieMeta: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 6,
   },
-  genre: {
-    color: '#888',
-    fontSize: 11,
-    marginRight: 8,
+  movieRating: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  hdBadge: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
+  movieYear: {
+    color: '#AAAAAA',
+    fontSize: 13,
+    fontWeight: '500',
   },
-  hdText: {
+  movieGenre: {
+    color: '#00d4aa',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  quickActions: {
+    padding: 15,
+    paddingTop: 0,
+  },
+  quickTrailerButton: {
+    backgroundColor: '#FFD700',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 18,
+    gap: 5,
+  },
+  quickTrailerText: {
     color: '#000000',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });
-
-export default MovieCard;

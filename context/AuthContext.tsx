@@ -1,123 +1,87 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { AuthContextType } from '../types';
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 interface User {
   id: string;
+  name: string;
   email: string;
-  name?: string;
-  token: string;
 }
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+interface AuthContextType {
+  user: User | null;
+  isLoggedIn: boolean;
+  login: (email: string, password: string, name?: string) => Promise<boolean>;
+  register: (email: string, password: string, name: string) => Promise<boolean>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadStoredAuth();
-  }, []);
-
-  const loadStoredAuth = async () => {
+  const login = async (email: string, password: string, name?: string): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('@movie_app_token');
-      const userData = await AsyncStorage.getItem('@movie_app_user');
-      
-      if (token && userData) {
-        const user = JSON.parse(userData);
-        setUser({ ...user, token });
+      if (email && password) {
+        const mockUser: User = {
+          id: '1',
+          email,
+          name: name || email.split('@')[0],
+        };
+        setUser(mockUser);
+        return true;
       }
-    } catch (error) {
-      console.error('Error loading stored auth:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (email: string, password?: string) => {
-    try {
-      setIsLoading(true);
-      
-      // For demo purposes, we'll create a mock user
-      // In a real app, you'd authenticate with your backend/Firebase
-      const mockUser: User = {
-        id: `user_${Date.now()}`,
-        email,
-        name: email.split('@')[0],
-        token: `token_${email}_${Date.now()}`
-      };
-
-      setUser(mockUser);
-      
-      // Store auth data
-      await AsyncStorage.setItem('@movie_app_token', mockUser.token);
-      await AsyncStorage.setItem('@movie_app_user', JSON.stringify(mockUser));
-      
-      return { success: true, user: mockUser };
+      return false;
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
-    } finally {
-      setIsLoading(false);
+      return false;
     }
   };
 
-  const logout = async () => {
+  const register = async (email: string, password: string, name: string): Promise<boolean> => {
     try {
-      setIsLoading(true);
-      setUser(null);
-      await AsyncStorage.removeItem('@movie_app_token');
-      await AsyncStorage.removeItem('@movie_app_user');
+      if (email && password && name) {
+        const newUser: User = {
+          id: Date.now().toString(),
+          email,
+          name,
+        };
+        setUser(newUser);
+        return true;
+      }
+      return false;
     } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Registration error:', error);
+      return false;
     }
   };
 
-  const register = async (email: string, password: string, name?: string) => {
-    try {
-      setIsLoading(true);
-      
-      // For demo purposes, we'll create a mock user
-      const mockUser: User = {
-        id: `user_${Date.now()}`,
-        email,
-        name: name || email.split('@')[0],
-        token: `token_${email}_${Date.now()}`
-      };
-
-      setUser(mockUser);
-      
-      // Store auth data
-      await AsyncStorage.setItem('@movie_app_token', mockUser.token);
-      await AsyncStorage.setItem('@movie_app_user', JSON.stringify(mockUser));
-      
-      return { success: true, user: mockUser };
-    } catch (error) {
-      console.error('Register error:', error);
-      return { success: false, error: 'Registration failed' };
-    } finally {
-      setIsLoading(false);
-    }
+  const logout = () => {
+    setUser(null);
   };
 
   const value: AuthContextType = {
     user,
-    isLoading,
+    isLoggedIn: !!user,
     login,
+    register,
     logout,
-    register
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

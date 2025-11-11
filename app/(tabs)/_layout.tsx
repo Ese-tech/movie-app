@@ -1,55 +1,80 @@
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import Navigation from '../../components/navigation';
-import { MovieProvider, useMovieContext } from '../../context/MovieContext';
+import React from 'react';
 
-const TabsLayoutContent = () => {
-  const { fetchPopularMovies, fetchTopRatedMovies, fetchUpcomingMovies } = useMovieContext();
-
-  return (
-    <>
-      <Navigation />
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: '#121212',
-          },
-          tabBarActiveTintColor: '#fff',
-          tabBarInactiveTintColor: '#888',
-        }}>
-        <Tabs.Screen
-          name="index"
-          options={{ title: 'Popular' }}
-          listeners={{
-            tabPress: () => fetchPopularMovies(),
-          }}
-        />
-        <Tabs.Screen
-          name="top-rated"
-          options={{ title: 'Top Rated' }}
-          listeners={{
-            tabPress: () => fetchTopRatedMovies(),
-          }}
-        />
-        <Tabs.Screen
-          name="upcoming"
-          options={{ title: 'Upcoming' }}
-          listeners={{
-            tabPress: () => fetchUpcomingMovies(),
-          }}
-        />
-      </Tabs>
-    </>
-  );
+function TabBarIcon(props: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+}) {
+  return <Ionicons size={24} style={{ marginBottom: -3 }} {...props} />;
 }
 
-const TabsLayout = () => {
+export default function TabLayout() {
   return (
-    <MovieProvider>
-      <TabsLayoutContent />
-    </MovieProvider>
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#FFD700',
+        tabBarInactiveTintColor: '#8C8C8C',
+        tabBarStyle: {
+          backgroundColor: '#0a0a0a',
+          borderBottomColor: 'rgba(0, 212, 170, 0.3)',
+          borderBottomWidth: 1,
+          position: 'top',
+          shadowColor: '#00d4aa',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        },
+        tabBarPosition: 'top',
+        headerShown: false,
+        tabBarPressColor: 'rgba(0, 212, 170, 0.2)',
+        tabBarIndicatorStyle: {
+          backgroundColor: '#00d4aa',
+          height: 3,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        },
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="movies"
+        options={{
+          title: 'Movies',
+          tabBarIcon: ({ color }) => <TabBarIcon name="film" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tv-series"
+        options={{
+          title: 'TV Series',
+          tabBarIcon: ({ color }) => <TabBarIcon name="tv" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="genres"
+        options={{
+          title: 'Genres',
+          tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <TabBarIcon name="person" color={color} />,
+        }}
+      />
+    </Tabs>
   );
-};
-
-export default TabsLayout;
+}
