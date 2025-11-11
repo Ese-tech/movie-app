@@ -19,7 +19,6 @@ export default function TabLayout() {
           backgroundColor: '#0a0a0a',
           borderBottomColor: 'rgba(0, 212, 170, 0.3)',
           borderBottomWidth: 1,
-          position: 'top',
           shadowColor: '#00d4aa',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
@@ -27,12 +26,7 @@ export default function TabLayout() {
           elevation: 4,
         },
         tabBarPosition: 'top',
-        headerShown: false,
-        tabBarPressColor: 'rgba(0, 212, 170, 0.2)',
-        tabBarIndicatorStyle: {
-          backgroundColor: '#00d4aa',
-          height: 3,
-        },
+        headerShown: true,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',

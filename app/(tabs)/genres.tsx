@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { fetchGenres, fetchTVGenres, Genre } from '../../api/tmdb';
+import { Sidebar } from '../../components/Sidebar';
 
 const genreIcons: { [key: string]: string } = {
   'Action': '⚔️',
@@ -102,74 +103,80 @@ export default function GenresScreen() {
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={['#0a0a0a', '#1a2332']} style={StyleSheet.absoluteFillObject} />
       
-      <ScrollView style={styles.content}>
-        {/* Title */}
-        <View style={styles.titleSection}>
-          <Text style={styles.pageTitle}>Browse by Genres</Text>
-          <Text style={styles.pageSubtitle}>Discover movies and TV shows by genre</Text>
-        </View>
+      <View style={styles.mainLayout}>
+        {/* Main Content */}
+        <ScrollView style={styles.content}>
+          {/* Title */}
+          <View style={styles.titleSection}>
+            <Text style={styles.pageTitle}>Browse by Genres</Text>
+            <Text style={styles.pageSubtitle}>Discover movies and TV shows by genre</Text>
+          </View>
 
-        {/* Type Selection */}
-        <View style={styles.typeSelection}>
-          <TouchableOpacity
-            style={[styles.typeButton, selectedType === 'movie' && styles.activeTypeButton]}
-            onPress={() => setSelectedType('movie')}
-          >
-            <Text style={[styles.typeButtonText, selectedType === 'movie' && styles.activeTypeButtonText]}>
-              Movies
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeButton, selectedType === 'tv' && styles.activeTypeButton]}
-            onPress={() => setSelectedType('tv')}
-          >
-            <Text style={[styles.typeButtonText, selectedType === 'tv' && styles.activeTypeButtonText]}>
-              TV Series
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {/* Type Selection */}
+          <View style={styles.typeSelection}>
+            <TouchableOpacity
+              style={[styles.typeButton, selectedType === 'movie' && styles.activeTypeButton]}
+              onPress={() => setSelectedType('movie')}
+            >
+              <Text style={[styles.typeButtonText, selectedType === 'movie' && styles.activeTypeButtonText]}>
+                Movies
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.typeButton, selectedType === 'tv' && styles.activeTypeButton]}
+              onPress={() => setSelectedType('tv')}
+            >
+              <Text style={[styles.typeButtonText, selectedType === 'tv' && styles.activeTypeButtonText]}>
+                TV Series
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Popular Genres */}
-        <View style={styles.popularSection}>
-          <Text style={styles.sectionTitle}>Popular Genres</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.popularGenresContainer}>
-              {popularGenres.map((genre) => (
-                <TouchableOpacity 
-                  key={genre.id} 
-                  style={styles.popularGenreCard}
-                  onPress={() => setSelectedGenre(genre)}
-                >
-                  <LinearGradient
-                    colors={['#00d4aa', '#FFD700']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.popularGenreGradient}
+          {/* Popular Genres */}
+          <View style={styles.popularSection}>
+            <Text style={styles.sectionTitle}>Popular Genres</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.popularGenresContainer}>
+                {popularGenres.map((genre) => (
+                  <TouchableOpacity 
+                    key={genre.id} 
+                    style={styles.popularGenreCard}
+                    onPress={() => setSelectedGenre(genre)}
                   >
-                    <Text style={styles.popularGenreIcon}>{genreIcons[genre.name] || '🎬'}</Text>
-                    <Text style={styles.popularGenreName}>{genre.name}</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
+                    <LinearGradient
+                      colors={['#00d4aa', '#FFD700']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.popularGenreGradient}
+                    >
+                      <Text style={styles.popularGenreIcon}>{genreIcons[genre.name] || '🎬'}</Text>
+                      <Text style={styles.popularGenreName}>{genre.name}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
 
-        {/* All Genres */}
-        <View style={styles.allGenresSection}>
-          <Text style={styles.sectionTitle}>All Genres ({currentGenres.length})</Text>
-          <FlatList
-            data={currentGenres}
-            renderItem={renderGenreCard}
-            keyExtractor={(item) => item.id.toString()}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.genresList}
-            scrollEnabled={false}
-          />
-        </View>
+          {/* All Genres */}
+          <View style={styles.allGenresSection}>
+            <Text style={styles.sectionTitle}>All Genres ({currentGenres.length})</Text>
+            <FlatList
+              data={currentGenres}
+              renderItem={renderGenreCard}
+              keyExtractor={(item) => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.genresList}
+              scrollEnabled={false}
+            />
+          </View>
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* Sidebar */}
+        <Sidebar isVisible={!loading} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -178,6 +185,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0a',
+  },
+  mainLayout: {
+    flex: 1,
+    flexDirection: 'row',
   },
   content: {
     flex: 1,

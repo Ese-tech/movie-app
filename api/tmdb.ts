@@ -219,3 +219,43 @@ export const getTrailerUrl = (videoKey: string): string => {
 export const getTrailerEmbedUrl = (videoKey: string): string => {
   return `https://www.youtube.com/embed/${videoKey}`;
 };
+
+// Additional functions for pagination and enhanced functionality
+export const fetchMoviesByCategory = async (category: string, page: number = 1): Promise<TMDBResponse<Movie>> => {
+  switch (category.toLowerCase()) {
+    case 'trending':
+      return fetchTrendingMovies();
+    case 'popular':
+      return fetchPopularMovies();
+    case 'top rated':
+    case 'top_rated':
+      return fetchTopRatedMovies();
+    case 'upcoming':
+      return fetchUpcomingMovies();
+    case 'now playing':
+    case 'now_playing':
+      return fetchNowPlayingMovies();
+    default:
+      return fetchPopularMovies();
+  }
+};
+
+export const fetchTVShowsByCategory = async (category: string, page: number = 1): Promise<TMDBResponse<TVShow>> => {
+  switch (category.toLowerCase()) {
+    case 'trending':
+      return fetchTrendingTVShows();
+    case 'popular':
+      return fetchPopularTVShows(page);
+    case 'top rated':
+    case 'top_rated':
+      return fetchTopRatedTVShows(page);
+    case 'on the air':
+    case 'on_the_air':
+      return fetchOnTheAirTVShows(page);
+    case 'airing today':
+    case 'airing_today':
+      return fetchAiringTodayTVShows(page);
+    default:
+      return fetchPopularTVShows(page);
+  }
+};

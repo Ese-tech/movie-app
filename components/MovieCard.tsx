@@ -4,22 +4,16 @@ import { Alert, Animated, Dimensions, Image, Linking, StyleSheet, Text, Touchabl
 import { fetchMovieVideos, fetchTVShowVideos, getPosterUrl } from '../api/tmdb';
 import { useAuth } from '../context/AuthContext';
 
-interface Movie {
+interface MovieCardProps {
   id: number;
   title?: string;
   name?: string;
-  vote_average: number;
-  year?: number;
-  genre?: string;
-  overview?: string;
   poster_path?: string;
+  vote_average: number;
   release_date?: string;
   first_air_date?: string;
+  overview?: string;
   isTV?: boolean;
-}
-
-interface MovieCardProps {
-  movie: Movie;
   onPress?: () => void;
   onWatchTrailer?: () => void;
   onWatchMovie?: () => void;
@@ -27,10 +21,18 @@ interface MovieCardProps {
 }
 
 const { width } = Dimensions.get('window');
-const cardWidth = (width - 80) / 2.5;
+const cardWidth = (width - 80) / 3;
 
-export default function MovieCard({ 
-  movie, 
+export function MovieCard({ 
+  id,
+  title,
+  name,
+  poster_path,
+  vote_average,
+  release_date,
+  first_air_date,
+  overview,
+  isTV = false,
   onPress, 
   onWatchTrailer, 
   onWatchMovie, 
@@ -67,9 +69,9 @@ export default function MovieCard({
     e.stopPropagation();
     try {
       // Fetch trailer from TMDB
-      const videosResponse = movie.isTV 
-        ? await fetchTVShowVideos(movie.id)
-        : await fetchMovieVideos(movie.id);
+      const videosResponse = isTV 
+        ? await fetchTVShowVideos(id)
+        : await fetchMovieVideos(id);
       
       const trailer = videosResponse.results.find(
         video => video.type === 'Trailer' && video.site === 'YouTube'
@@ -115,9 +117,9 @@ export default function MovieCard({
     onAddToWatchlist?.();
   };
 
-  const movieTitle = movie.title || movie.name || 'Unknown Title';
-  const releaseYear = movie.year || (movie.release_date ? new Date(movie.release_date).getFullYear() : 
-                     movie.first_air_date ? new Date(movie.first_air_date).getFullYear() : null);
+  const movieTitle = title || name || 'Unknown Title';
+  const releaseYear = release_date ? new Date(release_date).getFullYear() : 
+                     first_air_date ? new Date(first_air_date).getFullYear() : null;
 
   return (
     <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
@@ -129,9 +131,9 @@ export default function MovieCard({
         activeOpacity={0.9}
       >
         <View style={styles.posterContainer}>
-          {movie.poster_path ? (
+          {poster_path ? (
             <Image
-              source={{ uri: getPosterUrl(movie.poster_path) }}
+              source={{ uri: getPosterUrl(poster_path) }}
               style={styles.posterImage}
               resizeMode="cover"
             />
@@ -147,12 +149,12 @@ export default function MovieCard({
               <View style={styles.hoverContent}>
                 <Text style={styles.hoverTitle} numberOfLines={2}>{movieTitle}</Text>
                 <View style={styles.hoverMeta}>
-                  <Text style={styles.hoverRating}>⭐ {movie.vote_average.toFixed(1)}</Text>
+                  <Text style={styles.hoverRating}>⭐ {vote_average.toFixed(1)}</Text>
                   {releaseYear && <Text style={styles.hoverYear}>{releaseYear}</Text>}
                 </View>
-                {movie.overview && (
+                {overview && (
                   <Text style={styles.hoverOverview} numberOfLines={3}>
-                    {movie.overview}
+                    {overview}
                   </Text>
                 )}
                 <View style={styles.actionButtons}>
@@ -188,12 +190,9 @@ export default function MovieCard({
             {movieTitle}
           </Text>
           <View style={styles.movieMeta}>
-            <Text style={styles.movieRating}>⭐ {movie.vote_average.toFixed(1)}</Text>
+            <Text style={styles.movieRating}>⭐ {vote_average.toFixed(1)}</Text>
             {releaseYear && <Text style={styles.movieYear}>{releaseYear}</Text>}
           </View>
-          {movie.genre && (
-            <Text style={styles.movieGenre}>{movie.genre}</Text>
-          )}
         </View>
 
         {/* Quick Action Trailer Button Always Visible */}
@@ -213,9 +212,14 @@ export default function MovieCard({
 
 const styles = StyleSheet.create({
   container: {
-    width: cardWidth,
+    width: 80,
     marginBottom: 25,
     marginRight: 15,
+    flex: 1,
+    flexWrap: 'wrap',
+
+
+
   },
   card: {
     backgroundColor: '#1a1a1a',
@@ -228,11 +232,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    height: 530, // Fixed height for consistency
+    width: 300,
   },
   posterContainer: {
     position: 'relative',
     width: '100%',
-    height: 220,
+    height: 370,
   },
   posterImage: {
     width: '100%',
@@ -260,7 +266,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(85, 82, 82, 0.5)',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -306,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trailerButton: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#ffd90080',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
@@ -332,7 +338,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   movieInfo: {
-    padding: 15,
+    padding: 12,
+    height: 100, // Fixed info section height
+    justifyContent: 'space-between',
   },
   movieTitle: {
     color: '#FFFFFF',

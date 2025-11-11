@@ -32,6 +32,34 @@ export interface TVShow {
   origin_country: string[];
 }
 
+export interface TVSeries extends TVShow {
+  // Alias for TVShow for backward compatibility
+}
+
+export interface MovieContextType {
+  // State
+  movies: Movie[];
+  tvSeries: TVShow[];
+  title: string;
+  trailerUrl: string | null;
+  isLoading: boolean;
+  
+  // Actions
+  fetchPopularMovies: () => Promise<void>;
+  fetchTopRatedMovies: () => Promise<void>;
+  fetchUpcomingMovies: () => Promise<void>;
+  fetchFeaturedMovies: () => Promise<void>;
+  fetchAnimeMovies: () => Promise<void>;
+  searchMovies: (query: string) => Promise<void>;
+  fetchPopularTvSeries: () => Promise<void>;
+  fetchAiringTodayTvSeries: () => Promise<void>;
+  fetchOnTheAirTvSeries: () => Promise<void>;
+  fetchTopRatedTvSeries: () => Promise<void>;
+  fetchMoviesByGenre: (genreId: number) => Promise<void>;
+  fetchTrailer: (id: number, type: 'movie' | 'tv') => Promise<void>;
+  setTrailerUrl: (url: string) => void;
+}
+
 export interface Genre {
   id: number;
   name: string;

@@ -3,8 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, ImageBackground, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchPopularMovies, fetchTopRatedMovies, fetchTrendingMovies, Movie } from '../../api/tmdb';
-import MovieCard from '../../components/MovieCard';
+import { fetchPopularMovies, fetchTopRatedMovies, fetchTrendingMovies, getBackdropUrl, Movie } from '../../api/tmdb';
+import { MovieCard } from '../../components/MovieCard';
+import { Sidebar } from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 
 export default function HomeScreen() {
@@ -71,18 +72,14 @@ export default function HomeScreen() {
     Alert.alert('Watchlist', `Added ${movie.title} to your watchlist`);
   };
 
-  const convertToMovieCardFormat = (movie: Movie) => ({
-    id: movie.id,
-    title: movie.title,
-    vote_average: movie.vote_average,
-    year: movie.release_date ? new Date(movie.release_date).getFullYear() : undefined,
-    overview: movie.overview,
-    poster_path: movie.poster_path
-  });
-
   const renderMovieCard = ({ item }: { item: Movie }) => (
     <MovieCard
-      movie={convertToMovieCardFormat(item)}
+      id={item.id}
+      title={item.title}
+      poster_path={item.poster_path}
+      vote_average={item.vote_average}
+      release_date={item.release_date}
+      overview={item.overview}
       onPress={() => handleMoviePress(item)}
       onWatchTrailer={() => handleWatchTrailer(item)}
       onWatchMovie={() => handleWatchMovie(item)}
@@ -111,84 +108,101 @@ export default function HomeScreen() {
         style={StyleSheet.absoluteFillObject}
       />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00d4aa" />
-            <Text style={styles.loadingText}>Loading movies...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadMovieData}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Featured Movie Section */}
-            {featuredMovie && (
-              <View style={styles.featuredSection}>
-                <ImageBackground
-                  source={{ uri: `https://image.tmdb.org/t/p/original${featuredMovie.backdrop_path || featuredMovie.poster_path}` }}
-                  style={styles.featuredBackground}
-                  resizeMode="cover"
-                >
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(10,10,10,1)']}
-                    style={styles.featuredGradient}
+      <View style={styles.mainLayout}>
+        {/* Main Content */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#00d4aa" />
+              <Text style={styles.loadingText}>Loading movies...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={loadMovieData}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* Featured Movie Section */}
+              {featuredMovie && (
+                <View style={styles.featuredSection}>
+                  <ImageBackground
+                    source={{ uri: getBackdropUrl(featuredMovie.backdrop_path || featuredMovie.poster_path || '') }}
+                    style={styles.featuredBackground}
+                    resizeMode="cover"
                   >
-                    <View style={styles.featuredContent}>
-                      <View style={styles.featuredBadge}>
-                        <Text style={styles.featuredBadgeText}>MOVIE</Text>
-                      </View>
-                      <Text style={styles.featuredTitle}>{featuredMovie.title}</Text>
-                      <View style={styles.featuredMeta}>
-                        <Text style={styles.featuredRating}>
-                          ⭐ {featuredMovie.vote_average.toFixed(1)}/10
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.6)', 'rgba(10,10,10,0.9)']}
+                      style={styles.featuredGradient}
+                    >
+                      <View style={styles.featuredContent}>
+                        <View style={styles.featuredBadge}>
+                          <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                        </View>
+                        <Text style={styles.featuredTitle}>{featuredMovie.title}</Text>
+                        <View style={styles.featuredMeta}>
+                          <View style={styles.ratingContainer}>
+                            <Ionicons name="star" size={16} color="#FFD700" />
+                            <Text style={styles.featuredRating}>
+                              {featuredMovie.vote_average.toFixed(1)}
+                            </Text>
+                          </View>
+                          <Text style={styles.featuredYear}>
+                            {new Date(featuredMovie.release_date).getFullYear()}
+                          </Text>
+                          <View style={styles.qualityBadge}>
+                            <Text style={styles.qualityBadgeText}>4K</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.featuredOverview} numberOfLines={3}>
+                          {featuredMovie.overview}
                         </Text>
-                        <Text style={styles.featuredYear}>
-                          {new Date(featuredMovie.release_date).getFullYear()}
-                        </Text>
-                        <View style={styles.ratingBadge}>
-                          <Text style={styles.ratingBadgeText}>HD</Text>
+                        <View style={styles.featuredButtons}>
+                          <TouchableOpacity 
+                            style={styles.playButton}
+                            onPress={() => handleWatchMovie(featuredMovie)}
+                          >
+                            <LinearGradient
+                              colors={['#00d4aa', '#00b894']}
+                              style={styles.playButtonGradient}
+                            >
+                              <Ionicons name="play" size={20} color="#000000" />
+                              <Text style={styles.playButtonText}>Watch Trailer</Text>
+                              <Text style={styles.playButtonText}>Watch Movie</Text>
+                            </LinearGradient>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.infoButton}
+                            onPress={() => handleMoviePress(featuredMovie)}
+                          >
+                            <View style={styles.infoButtonContent}>
+                              <Ionicons name="information-circle-outline" size={20} color="#FFD700" />
+                              <Text style={styles.infoButtonText}>More Info</Text>
+                            </View>
+                          </TouchableOpacity>
                         </View>
                       </View>
-                      <Text style={styles.featuredOverview} numberOfLines={3}>
-                        {featuredMovie.overview}
-                      </Text>
-                      <View style={styles.featuredButtons}>
-                        <TouchableOpacity 
-                          style={styles.playButton}
-                          onPress={() => handleWatchMovie(featuredMovie)}
-                        >
-                          <Ionicons name="play" size={20} color="#000000" />
-                          <Text style={styles.playButtonText}>Watch Movie</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.infoButton}
-                          onPress={() => handleMoviePress(featuredMovie)}
-                        >
-                          <Ionicons name="information-circle" size={20} color="#FFD700" />
-                          <Text style={styles.infoButtonText}>More Info</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                </ImageBackground>
-              </View>
-            )}
+                    </LinearGradient>
+                  </ImageBackground>
+                </View>
+              )}
 
-            <View style={styles.sectionsContainer}>
-              {renderMovieRow("🔥 Trending Now", trendingMovies)}
-              {renderMovieRow("⭐ Popular Movies", popularMovies)}
-              {renderMovieRow("🏆 Top Rated", topRatedMovies)}
-            </View>
-          </>
-        )}
-        
-        <View style={{ height: 120 }} />
-      </ScrollView>
+              <View style={styles.sectionsContainer}>
+                {renderMovieRow("🔥 Trending Now", trendingMovies)}
+                {renderMovieRow("⭐ Popular Movies", popularMovies)}
+                {renderMovieRow("🏆 Top Rated", topRatedMovies)}
+              </View>
+            </>
+          )}
+          
+          <View style={{ height: 120 }} />
+        </ScrollView>
+
+        {/* Sidebar */}
+        <Sidebar isVisible={!loading && !error} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -197,6 +211,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0a',
+  },
+  mainLayout: {
+    flex: 1,
+    flexDirection: 'row',
   },
   content: {
     flex: 1,
@@ -218,12 +236,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   featuredBadge: {
-    backgroundColor: '#00d4aa',
+    backgroundColor: '#FFD700',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: 6,
+    borderRadius: 6,
     alignSelf: 'flex-start',
     marginBottom: 15,
+    elevation: 5,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
   featuredBadgeText: {
     color: '#000000',
@@ -246,35 +269,44 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     gap: 15,
   },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
   featuredRating: {
     color: '#FFD700',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
   featuredYear: {
     color: '#CCCCCC',
     fontSize: 14,
     fontWeight: '500',
   },
-  ratingBadge: {
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+  qualityBadge: {
+    backgroundColor: 'rgba(0, 212, 170, 0.3)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 3,
+    paddingVertical: 4,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#FFD700',
+    borderColor: '#00d4aa',
   },
-  ratingBadgeText: {
-    color: '#FFD700',
-    fontSize: 11,
+  qualityBadgeText: {
+    color: '#00d4aa',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   featuredOverview: {
     color: '#DDDDDD',
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 25,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
@@ -283,19 +315,19 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   playButton: {
-    backgroundColor: '#00d4aa',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
-    flex: 1,
-    justifyContent: 'center',
+    borderRadius: 25,
+    overflow: 'hidden',
+    elevation: 8,
     shadowColor: '#00d4aa',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+  },
+  playButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 25,
+    paddingVertical: 12,
   },
   playButtonText: {
     color: '#000000',
@@ -304,28 +336,29 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   infoButton: {
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+    overflow: 'hidden',
+  },
+  infoButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
-    flex: 1,
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFD700',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   infoButtonText: {
     color: '#FFD700',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginLeft: 8,
   },
   sectionsContainer: {
-    paddingTop: 20,
+    paddingTop: 30,
   },
   movieRow: {
-    marginTop: 35,
+    marginBottom: 35,
   },
   sectionTitle: {
     color: '#FFFFFF',
@@ -339,7 +372,6 @@ const styles = StyleSheet.create({
   },
   movieList: {
     paddingLeft: 20,
-    paddingRight: 10,
   },
   loadingContainer: {
     flex: 1,

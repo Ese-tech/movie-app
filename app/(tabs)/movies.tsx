@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { fetchPopularMovies, fetchTopRatedMovies, fetchTrendingMovies, fetchUpcomingMovies, getPosterUrl, Movie } from '../../api/tmdb';
+import { Sidebar } from '../../components/Sidebar';
 
 const categories = ['Featured', 'Popular', 'Top Rated', 'Upcoming'];
 
@@ -71,42 +72,41 @@ export default function MoviesScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Category Navigation */}
-          <View style={styles.categoryNavigation}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesContainer}
-            >
-              {categories.map(category => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.categoryButton,
-                    selectedCategory === category && styles.activeCategoryButton
-                  ]}
-                  onPress={() => setSelectedCategory(category)}
-                >
-                  <Text style={[
-                    styles.categoryText,
-                    selectedCategory === category && styles.activeCategoryText
-                  ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#00d4aa" />
-              <Text style={styles.loadingText}>Loading movies...</Text>
+        <View style={styles.mainContainer}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Category Navigation */}
+            <View style={styles.categoryNavigation}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesContainer}
+              >
+                {categories.map(category => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryButton,
+                      selectedCategory === category && styles.activeCategoryButton
+                    ]}
+                    onPress={() => setSelectedCategory(category)}
+                  >
+                    <Text style={[
+                      styles.categoryText,
+                      selectedCategory === category && styles.activeCategoryText
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          ) : (
-            <View style={styles.mainLayout}>
-              {/* Main Movies Grid */}
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#00d4aa" />
+                <Text style={styles.loadingText}>Loading movies...</Text>
+              </View>
+            ) : (
               <View style={styles.moviesGrid}>
                 <Text style={styles.sectionTitle}>Movies</Text>
                 <View style={styles.categoriesSubHeader}>
@@ -129,77 +129,20 @@ export default function MoviesScreen() {
                         style={styles.moviePoster}
                         resizeMode="cover"
                       />
-                      <View style={styles.movieInfo}>
-                        <Text style={styles.movieTitle} numberOfLines={1}>{movie.title}</Text>
-                        <Text style={styles.movieRating}>
-                          {movie.vote_average.toFixed(1)}/10 {new Date(movie.release_date).getFullYear()}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                
-                {/* View More Button */}
-                <TouchableOpacity style={styles.viewMoreButton}>
-                  <Text style={styles.viewMoreText}>View more</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Sidebar with Most Viewed and Recommended */}
-              <View style={styles.sidebar}>
-                <Text style={styles.sidebarMainTitle}>MOST VIEWED</Text>
-                
-                <View style={styles.sidebarSection}>
-                  {mostViewedMovies.map((movie, index) => (
-                    <TouchableOpacity key={movie.id} style={styles.sidebarItem}>
-                      <Text style={styles.rankNumber}>#{index + 1}</Text>
-                      <Image 
-                        source={{ uri: getPosterUrl(movie.poster_path) }}
-                        style={styles.sidebarPoster}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.sidebarMovieInfo}>
-                        <Text style={styles.sidebarMovieTitle} numberOfLines={2}>{movie.title}</Text>
-                        <Text style={styles.sidebarMovieRating}>
-                          {movie.vote_average.toFixed(1)}/10 {new Date(movie.release_date).getFullYear()}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.sidebarMainTitle}>RECOMMENDED</Text>
-                
-                <View style={styles.sidebarTabs}>
-                  <TouchableOpacity style={[styles.sidebarTab, styles.activeSidebarTab]}>
-                    <Text style={[styles.sidebarTabText, styles.activeSidebarTabText]}>Most Favorite</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.sidebarTab}>
-                    <Text style={styles.sidebarTabText}>Upcoming Movies</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.sidebarSection}>
-                  {recommendedMovies.map((movie) => (
-                    <TouchableOpacity key={movie.id} style={styles.sidebarItem}>
-                      <Image 
-                        source={{ uri: getPosterUrl(movie.poster_path) }}
-                        style={styles.sidebarPoster}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.sidebarMovieInfo}>
-                        <Text style={styles.sidebarMovieTitle} numberOfLines={2}>{movie.title}</Text>
-                        <Text style={styles.sidebarMovieRating}>
-                          {movie.vote_average.toFixed(1)}/10 {new Date(movie.release_date).getFullYear()}
-                        </Text>
-                      </View>
+                      <Text style={styles.movieTitle} numberOfLines={1}>{movie.title}</Text>
+                      <Text style={styles.movieRating}>{movie.vote_average.toFixed(1)}/10</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
-            </View>
-          )}
-        </ScrollView>
+            )}
+
+            <View style={{ height: 100 }} />
+          </ScrollView>
+
+          {/* Use new Sidebar component */}
+          <Sidebar isVisible={!loading} />
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -211,6 +154,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  mainContainer: {
+    flex: 1,
+    flexDirection: 'row',
   },
   header: {
     flexDirection: 'row',
@@ -286,23 +233,24 @@ const styles = StyleSheet.create({
   },
   mainLayout: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    padding: 0,
     paddingTop: 20,
     flex: 1,
   },
   moviesGrid: {
     flex: 2,
     marginRight: 30,
+    marginLeft: 30,
   },
   sectionTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 20,
+    marginBottom: 50,
   },
   categoriesSubHeader: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 25,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -372,6 +320,7 @@ const styles = StyleSheet.create({
   sidebar: {
     flex: 1,
     paddingLeft: 0,
+  
   },
   sidebarMainTitle: {
     fontSize: 14,
@@ -381,12 +330,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   sidebarSection: {
-    marginBottom: 30,
+    marginBottom: 50,
   },
   sidebarItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 15,
+    marginBottom: 25,
     padding: 0,
   },
   rankNumber: {
