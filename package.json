@@ -9,7 +9,9 @@
     "web": "expo start --web",
     "build": "npx expo export -p web",
     "build:web": "npx expo export -p web",
-    "export": "npx expo export -p web"
+    "export": "npx expo export -p web",
+    "deploy": "npx vercel",
+    "deploy:prod": "npx vercel --prod"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -39,7 +41,8 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "react-test-renderer": "19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vercel": "^48.9.1"
   },
   "private": true
 }

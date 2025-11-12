@@ -13,10 +13,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "functions": {
-    "app/**": {
-      "runtime": "@vercel/static-build"
-    }
-  }
+  ]
 }
