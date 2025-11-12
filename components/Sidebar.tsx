@@ -3,7 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchPopularMovies, fetchTopRatedMovies, getPosterUrl, Movie } from '../api/tmdb';
+import { Movie } from '../types';
+import { movieAPI } from '../src/api/tmdbApi';
 
 interface SidebarProps {
   isVisible?: boolean;
@@ -23,14 +24,14 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
     try {
       setLoading(true);
       const [popularData, topRatedData] = await Promise.all([
-        fetchPopularMovies(),
-        fetchTopRatedMovies()
+        movieAPI.getPopular(),
+        movieAPI.getTopRated()
       ]);
 
       // Most viewed = popular movies (first 8)
-      setMostViewed(popularData.results.slice(0, 8));
+      setMostViewed((popularData.results || popularData).slice(0, 8));
       // Recommended = top rated movies (first 8)
-      setRecommended(topRatedData.results.slice(0, 8));
+      setRecommended((topRatedData.results || topRatedData).slice(0, 8));
     } catch (error) {
       console.error('Error loading sidebar data:', error);
     } finally {
@@ -39,15 +40,15 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
   };
 
   const navigateToMovie = (movieId: number) => {
-    router.push('/modal');
+    router.push(`/modal?id=${movieId}`);
   };
 
   const handleViewMoreMostViewed = () => {
-    router.push('/movies');
+    router.push('/(tabs)/movies?category=Popular');
   };
 
   const handleViewMoreRecommended = () => {
-    router.push('/movies');
+    router.push('/(tabs)/movies?category=Latest');
   };
 
   const renderSidebarMovie = (item: Movie, index: number, section: 'viewed' | 'recommended') => (
@@ -60,7 +61,11 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
         <Text style={styles.sidebarMovieRankText}>{index + 1}</Text>
       </View>
       <Image
-        source={{ uri: getPosterUrl(item.poster_path || '') }}
+        source={{ 
+          uri: item.poster_path 
+            ? `https://image.tmdb.org/t/p/w500${item.poster_path}` 
+            : 'https://via.placeholder.com/500x750?text=No+Image'
+        }}
         style={styles.sidebarMoviePoster}
         resizeMode="cover"
       />
@@ -157,15 +162,13 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
 
 const styles = StyleSheet.create({
   sidebar: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
+    maxWidth: 230,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingVertical: 1,
+    paddingHorizontal: 2,
     borderLeftWidth: 1,
     borderLeftColor: 'rgba(0, 212, 170, 0.2)',
-    maxHeight: 800, // Ensure proper height for scrolling
-    maxWidth: 300,
-    marginTop: 100,
+    maxHeight: '100%',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -228,8 +231,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sidebarMoviePoster: {
-    width: 32,
-    height: 48,
+    width: 52,
+    height: 68,
     borderRadius: 4,
     marginRight: 8,
     borderWidth: 1,

@@ -26,7 +26,7 @@ export default function TabLayout() {
           elevation: 4,
         },
         tabBarPosition: 'top',
-        headerShown: true,
+        headerShown: false,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',

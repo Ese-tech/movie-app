@@ -1,9 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchGenres, fetchTVGenres, Genre } from '../../api/tmdb';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Footer } from '../../components/Footer';
+import { Header } from '../../components/Header';
+import { MovieCard } from '../../components/MovieCard';
 import { Sidebar } from '../../components/Sidebar';
+import { TrailerModal } from '../../components/TrailerModal';
+import { UniversalHero } from '../../components/UniversalHero';
+import { useAuth } from '../../context/AuthContext';
+import { Movie } from '../../types';
+import { discoverAPI } from '../../src/api/tmdbApi';
+
+// Mock genres data - replace with TMDB API call
+const movieGenres = [
+  { id: 28, name: 'Action' },
+  { id: 12, name: 'Adventure' },
+  { id: 16, name: 'Animation' },
+  { id: 35, name: 'Comedy' },
+  { id: 80, name: 'Crime' },
+  { id: 99, name: 'Documentary' },
+  { id: 18, name: 'Drama' },
+  { id: 10751, name: 'Family' },
+  { id: 14, name: 'Fantasy' },
+  { id: 36, name: 'History' },
+  { id: 27, name: 'Horror' },
+  { id: 10402, name: 'Music' },
+  { id: 9648, name: 'Mystery' },
+  { id: 10749, name: 'Romance' },
+  { id: 878, name: 'Science Fiction' },
+  { id: 53, name: 'Thriller' },
+  { id: 10752, name: 'War' },
+  { id: 37, name: 'Western' },
+];
+
+const tvGenres = [
+  { id: 10759, name: 'Action & Adventure' },
+  { id: 16, name: 'Animation' },
+  { id: 35, name: 'Comedy' },
+  { id: 80, name: 'Crime' },
+  { id: 99, name: 'Documentary' },
+  { id: 18, name: 'Drama' },
+  { id: 10751, name: 'Family' },
+  { id: 10762, name: 'Kids' },
+  { id: 9648, name: 'Mystery' },
+  { id: 10763, name: 'News' },
+  { id: 10764, name: 'Reality' },
+  { id: 10765, name: 'Sci-Fi & Fantasy' },
+  { id: 10766, name: 'Soap' },
+  { id: 10767, name: 'Talk' },
+  { id: 10768, name: 'War & Politics' },
+  { id: 37, name: 'Western' },
+];
 
 const genreIcons: { [key: string]: string } = {
   'Action': '⚔️',
@@ -25,158 +74,323 @@ const genreIcons: { [key: string]: string } = {
   'Thriller': '😱',
   'War': '⚔️',
   'Western': '🤠',
-  'Action & Adventure': '�️',
+  'Action & Adventure': '⚡',
   'Sci-Fi & Fantasy': '🌟',
   'Reality': '📹',
   'Talk': '🎙️',
-  'News': '�',
+  'News': '📰',
   'Soap': '💭',
   'Kids': '🧸',
+  'War & Politics': '🏛️',
 };
 
 export default function GenresScreen() {
-  const [movieGenres, setMovieGenres] = useState<Genre[]>([]);
-  const [tvGenres, setTVGenres] = useState<Genre[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+  const router = useRouter();
+  const { isLoggedIn } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<'movie' | 'tv'>('movie');
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [allMovies, setAllMovies] = useState<Movie[]>([]);
+  const [showMovies, setShowMovies] = useState(false);
+  const [trailerModalVisible, setTrailerModalVisible] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showingMore, setShowingMore] = useState(false);
 
-  useEffect(() => {
-    loadGenres();
-  }, []);
+  const currentGenres = selectedType === 'movie' ? movieGenres : tvGenres;
 
-  const loadGenres = async () => {
+  const handleGenrePress = async (genre: any) => {
     try {
+      setSelectedGenre(genre);
       setLoading(true);
-      const [movieGenresData, tvGenresData] = await Promise.all([
-        fetchGenres(),
-        fetchTVGenres()
-      ]);
-      setMovieGenres(movieGenresData.genres);
-      setTVGenres(tvGenresData.genres);
+      setShowMovies(true);
+      
+      if (selectedType === 'movie') {
+        const movieData = await discoverAPI.moviesByGenre(genre.id);
+        setMovies(movieData.slice(0, 20)); // Show first 20 initially
+        setAllMovies(movieData); // Store all movies
+        setCurrentPage(1);
+        setShowingMore(false);
+      } else {
+        const tvData = await discoverAPI.tvByGenre(genre.id);
+        // Convert TVShow to Movie-like structure for display
+        const adaptedTvData = tvData.map(show => ({
+          ...show,
+          title: show.name || show.original_name,
+          release_date: show.first_air_date,
+          original_title: show.original_name,
+          adult: false,
+          video: false,
+        }));
+        setMovies(adaptedTvData as Movie[]);
+      }
     } catch (error) {
-      console.error('Error loading genres:', error);
+      console.error('Error loading genre movies:', error);
+      Alert.alert('Error', 'Failed to load movies for this genre');
     } finally {
       setLoading(false);
     }
   };
 
-  const currentGenres = selectedType === 'movie' ? movieGenres : tvGenres;
-  const popularGenres = currentGenres.slice(0, 5);
+  const handleMoviePress = (movie: Movie) => {
+    router.push(`/modal?id=${movie.id}`);
+  };
 
-  const renderGenreCard = ({ item }: { item: Genre }) => (
-    <TouchableOpacity 
-      style={[
-        styles.genreCard,
-        selectedGenre?.id === item.id && styles.selectedGenreCard
-      ]}
-      onPress={() => setSelectedGenre(selectedGenre?.id === item.id ? null : item)}
-    >
-      <View style={styles.genreIconContainer}>
-        <Text style={styles.genreIcon}>{genreIcons[item.name] || '🎬'}</Text>
-      </View>
-      <View style={styles.genreInfo}>
-        <Text style={styles.genreName}>{item.name}</Text>
-        <Text style={styles.genreType}>{selectedType === 'movie' ? 'Movies' : 'TV Series'}</Text>
-      </View>
-      <Ionicons 
-        name={selectedGenre?.id === item.id ? "chevron-up" : "chevron-forward"} 
-        size={20} 
-        color="#8C8C8C" 
+  const handleWatchTrailer = (movie: Movie) => {
+    setSelectedMovie(movie);
+    setTrailerModalVisible(true);
+  };
+
+  const handleWatchMovie = (movie: Movie) => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Login Required',
+        'Please log in to watch movies.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/profile') }
+        ]
+      );
+      return;
+    }
+    
+    Alert.alert('Watch Movie', `Streaming ${movie.title}`);
+  };
+
+  const handleAddToWatchlist = (movie: Movie) => {
+    Alert.alert('Watchlist', `Added ${movie.title} to your watchlist`);
+  };
+
+  const handleViewMoreMovies = async () => {
+    if (!showingMore && selectedGenre) {
+      try {
+        setLoading(true);
+        // Load more movies from API or show all cached movies
+        const nextPage = currentPage + 1;
+        const moreMovies = await discoverAPI.moviesByGenre(selectedGenre.id, nextPage);
+        setAllMovies(prev => [...prev, ...moreMovies]);
+        setMovies(prev => [...prev, ...moreMovies.slice(0, 20)]);
+        setCurrentPage(nextPage);
+        setShowingMore(true);
+      } catch (error) {
+        console.error('Error loading more movies:', error);
+        // Fallback: show all cached movies
+        setMovies(allMovies);
+        setShowingMore(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const closeTrailerModal = () => {
+    setTrailerModalVisible(false);
+    setSelectedMovie(null);
+  };
+
+  const renderMovieCard = ({ item }: { item: Movie }) => (
+    <View style={styles.movieCardWrapper}>
+      <MovieCard
+        id={item.id}
+        title={item.title}
+        poster_path={item.poster_path}
+        vote_average={item.vote_average}
+        release_date={item.release_date}
+        overview={item.overview}
+        onPress={() => handleMoviePress(item)}
+        onWatchTrailer={() => handleWatchTrailer(item)}
+        onWatchMovie={() => handleWatchMovie(item)}
+        onAddToWatchlist={() => handleAddToWatchlist(item)}
       />
+    </View>
+  );
+
+  const renderGenre = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.genreCard} 
+      onPress={() => handleGenrePress(item)}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={['rgba(0, 212, 170, 0.2)', 'rgba(0, 212, 170, 0.05)']}
+        style={styles.genreGradient}
+      >
+        <Text style={styles.genreIcon}>
+          {genreIcons[item.name] || '🎬'}
+        </Text>
+        <Text style={styles.genreName}>{item.name}</Text>
+        <View style={styles.genreStats}>
+          <Ionicons name="film" size={16} color="#00d4aa" />
+          <Text style={styles.genreCount}>
+            {selectedType === 'movie' ? 'Movies' : 'TV Shows'}
+          </Text>
+        </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient colors={['#0a0a0a', '#1a2332']} style={StyleSheet.absoluteFillObject} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00d4aa" />
-          <Text style={styles.loadingText}>Loading genres...</Text>
-        </View>
+        <LinearGradient colors={['#0A0F28', '#1A1F3A']} style={styles.container}>
+          <Header />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00d4aa" />
+            <Text style={styles.loadingText}>Loading genres...</Text>
+          </View>
+          <Footer />
+        </LinearGradient>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={['#0a0a0a', '#1a2332']} style={StyleSheet.absoluteFillObject} />
-      
-      <View style={styles.mainLayout}>
-        {/* Main Content */}
-        <ScrollView style={styles.content}>
-          {/* Title */}
-          <View style={styles.titleSection}>
-            <Text style={styles.pageTitle}>Browse by Genres</Text>
-            <Text style={styles.pageSubtitle}>Discover movies and TV shows by genre</Text>
-          </View>
+      <LinearGradient colors={['#0A0F28', '#1A1F3A']} style={styles.container}>
+        
+        <Header />
+        
+        <View style={styles.mainLayout}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Hero Section */}
+            <UniversalHero currentPage="genres" />
+            
+            {!showMovies ? (
+              <>
+                {/* Header Section */}
+                <View style={styles.headerSection}>
+                  <Text style={styles.pageTitle}>Browse by Genre</Text>
+                  <Text style={styles.pageSubtitle}>
+                    Discover movies and TV shows by your favorite genres
+                  </Text>
+                </View>
 
-          {/* Type Selection */}
-          <View style={styles.typeSelection}>
-            <TouchableOpacity
-              style={[styles.typeButton, selectedType === 'movie' && styles.activeTypeButton]}
-              onPress={() => setSelectedType('movie')}
-            >
-              <Text style={[styles.typeButtonText, selectedType === 'movie' && styles.activeTypeButtonText]}>
-                Movies
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, selectedType === 'tv' && styles.activeTypeButton]}
-              onPress={() => setSelectedType('tv')}
-            >
-              <Text style={[styles.typeButtonText, selectedType === 'tv' && styles.activeTypeButtonText]}>
-                TV Series
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Popular Genres */}
-          <View style={styles.popularSection}>
-            <Text style={styles.sectionTitle}>Popular Genres</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.popularGenresContainer}>
-                {popularGenres.map((genre) => (
-                  <TouchableOpacity 
-                    key={genre.id} 
-                    style={styles.popularGenreCard}
-                    onPress={() => setSelectedGenre(genre)}
+                {/* Content Type Toggle */}
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      selectedType === 'movie' && styles.activeToggleButton,
+                    ]}
+                    onPress={() => setSelectedType('movie')}
                   >
-                    <LinearGradient
-                      colors={['#00d4aa', '#FFD700']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.popularGenreGradient}
-                    >
-                      <Text style={styles.popularGenreIcon}>{genreIcons[genre.name] || '🎬'}</Text>
-                      <Text style={styles.popularGenreName}>{genre.name}</Text>
-                    </LinearGradient>
+                    <Ionicons 
+                      name="film" 
+                      size={20} 
+                      color={selectedType === 'movie' ? '#000' : '#fff'} 
+                    />
+                    <Text style={[
+                      styles.toggleText,
+                      selectedType === 'movie' && styles.activeToggleText,
+                    ]}>
+                      Movies
+                    </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      selectedType === 'tv' && styles.activeToggleButton,
+                    ]}
+                    onPress={() => setSelectedType('tv')}
+                  >
+                    <Ionicons 
+                      name="tv" 
+                      size={20} 
+                      color={selectedType === 'tv' ? '#000' : '#fff'} 
+                    />
+                    <Text style={[
+                      styles.toggleText,
+                      selectedType === 'tv' && styles.activeToggleText,
+                    ]}>
+                      TV Shows
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-          {/* All Genres */}
-          <View style={styles.allGenresSection}>
-            <Text style={styles.sectionTitle}>All Genres ({currentGenres.length})</Text>
-            <FlatList
-              data={currentGenres}
-              renderItem={renderGenreCard}
-              keyExtractor={(item) => item.id.toString()}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.genresList}
-              scrollEnabled={false}
-            />
-          </View>
+                {/* Genres Grid */}
+                <View style={styles.genresSection}>
+                  <FlatList
+                    data={currentGenres}
+                    renderItem={renderGenre}
+                    keyExtractor={(item) => item.id.toString()}
+                    numColumns={2}
+                    ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    columnWrapperStyle={styles.row}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.genresList}
+                    scrollEnabled={false}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Back to Genres Button */}
+                <View style={styles.backToGenresContainer}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setShowMovies(false)}
+                  >
+                    <Ionicons name="arrow-back" size={24} color="#00d4aa" />
+                    <Text style={styles.backText}>Back to Genres</Text>
+                  </TouchableOpacity>
+                </View>
 
-          <View style={{ height: 100 }} />
-        </ScrollView>
+                {/* Selected Genre Movies */}
+                <View style={styles.moviesHeader}>
+                  <Text style={styles.moviesTitle}>
+                    {selectedGenre?.name} {selectedType === 'movie' ? 'Movies' : 'TV Shows'}
+                  </Text>
+                  <Text style={styles.moviesCount}>{movies.length} results</Text>
+                </View>
 
-        {/* Sidebar */}
-        <Sidebar isVisible={!loading} />
-      </View>
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#00d4aa" />
+                    <Text style={styles.loadingText}>Loading {selectedGenre?.name} movies...</Text>
+                  </View>
+                ) : (
+                  <>
+                    <FlatList
+                      data={movies}
+                      renderItem={renderMovieCard}
+                      keyExtractor={(item) => item.id.toString()}
+                      numColumns={4}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.moviesList}
+                      columnWrapperStyle={styles.moviesRow}
+                    />
+                    
+                    {/* View More Button - Full width */}
+                    {!showingMore && allMovies.length > movies.length && (
+                      <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMoreMovies}>
+                        <Text style={styles.fullWidthViewMoreText}>View more</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Add some bottom padding before footer */}
+            <View style={{ height: 100 }} />
+            
+            <Footer />
+          </ScrollView>
+
+          {/* Sidebar */}
+          <Sidebar />
+        </View>
+
+        {/* Trailer Modal */}
+        <TrailerModal
+          visible={trailerModalVisible}
+          onClose={closeTrailerModal}
+          movieId={selectedMovie?.id || null}
+          movieTitle={selectedMovie?.title || ''}
+        />
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -184,7 +398,7 @@ export default function GenresScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0A0F28',
   },
   mainLayout: {
     flex: 1,
@@ -192,162 +406,175 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: 20,
-  },
-  titleSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  pageTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 212, 170, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  pageSubtitle: {
-    color: '#CCCCCC',
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  typeSelection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.3)',
-    marginHorizontal: 5,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  activeTypeButton: {
-    backgroundColor: '#00d4aa',
-    borderColor: '#00d4aa',
-  },
-  typeButtonText: {
-    color: '#CCCCCC',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  activeTypeButtonText: {
-    color: '#000000',
-    fontWeight: '600',
-  },
-  popularSection: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    textShadowColor: 'rgba(0, 212, 170, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  popularGenresContainer: {
-    flexDirection: 'row',
-    paddingLeft: 20,
-  },
-  popularGenreCard: {
-    width: 120,
-    height: 100,
-    marginRight: 15,
-    borderRadius: 15,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#00d4aa',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  popularGenreGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 10,
-  },
-  popularGenreIcon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  popularGenreName: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  allGenresSection: {
-    paddingHorizontal: 20,
-  },
-  genresList: {
-    paddingBottom: 20,
-  },
-  genreCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.2)',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  selectedGenreCard: {
-    borderColor: '#00d4aa',
-    backgroundColor: 'rgba(0, 212, 170, 0.1)',
-    shadowColor: '#00d4aa',
-    shadowOpacity: 0.4,
-  },
-  genreIconContainer: {
-    width: 50,
-    height: 50,
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.3)',
-  },
-  genreIcon: {
-    fontSize: 20,
-  },
-  genreInfo: {
-    flex: 1,
-  },
-  genreName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  genreType: {
-    color: '#CCCCCC',
-    fontSize: 14,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 100,
   },
   loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#fff',
     marginTop: 10,
+    fontSize: 16,
+  },
+  headerSection: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  pageSubtitle: {
+    fontSize: 16,
+    color: '#ccc',
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  activeToggleButton: {
+    backgroundColor: '#00d4aa',
+  },
+  toggleText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  activeToggleText: {
+    color: '#000',
+  },
+  genresSection: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  genresList: {
+    paddingBottom: 20,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  separator: {
+    height: 16,
+  },
+  genreCard: {
+    flex: 0.48,
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  genreGradient: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 170, 0.3)',
+  },
+  genreIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  genreName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  genreStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  genreCount: {
+    color: '#00d4aa',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // New styles for movie display
+  backToGenresContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  backText: {
+    color: '#00d4aa',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  moviesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 212, 170, 0.2)',
+  },
+  moviesTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  moviesCount: {
+    color: '#00d4aa',
+    fontSize: 14,
+  },
+  moviesList: {
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+  },
+  moviesRow: {
+    justifyContent: 'center',
+    gap: 16,
+  },
+  movieCardWrapper: {
+    width: 280,
+    marginVertical: 8,
+  },
+  fullWidthViewMoreButton: {
+    backgroundColor: '#00d4aa',
+    marginHorizontal: 16,
+    marginVertical: 20,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullWidthViewMoreText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

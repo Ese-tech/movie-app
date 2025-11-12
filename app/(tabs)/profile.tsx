@@ -2,6 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Footer } from '../../components/Footer';
+import { Header } from '../../components/Header';
+import { Sidebar } from '../../components/Sidebar';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileScreen() {
@@ -52,14 +55,10 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={['#141414', '#000000']} style={StyleSheet.absoluteFillObject} />
         
-        <View style={styles.header}>
-          <Text style={styles.logo}>Cineverse</Text>
-          <TouchableOpacity onPress={handleLogout}>
-            <Ionicons name="log-out" size={24} color="#E50914" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content}>
+        <Header />
+        
+        <View style={styles.mainLayout}>
+          <ScrollView style={styles.content}>
           {/* Profile Info */}
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
@@ -114,7 +113,13 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <View style={{ height: 100 }} />
+          
+          <Footer />
         </ScrollView>
+
+        {/* Sidebar */}
+        <Sidebar />
+      </View>
       </SafeAreaView>
     );
   }
@@ -123,11 +128,10 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={['#141414', '#000000']} style={StyleSheet.absoluteFillObject} />
       
-      <View style={styles.header}>
-        <Text style={styles.logo}>Cineverse</Text>
-      </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.authContainer}>
+      <Header />
+      
+      <View style={styles.mainLayout}>
+        <ScrollView style={styles.content} contentContainerStyle={styles.authContainer}>
         <View style={styles.authCard}>
           <Text style={styles.authTitle}>
             {isLoginMode ? 'Welcome Back' : 'Create Account'}
@@ -200,7 +204,15 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <View style={{ height: 100 }} />
+        
+        <Footer />
       </ScrollView>
+
+      {/* Sidebar */}
+      <Sidebar />
+    </View>
     </SafeAreaView>
   );
 }
@@ -210,18 +222,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#141414',
   },
-  header: {
+  mainLayout: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  logo: {
-    color: '#E50914',
-    fontSize: 28,
-    fontWeight: 'bold',
   },
   content: {
     flex: 1,

@@ -12,23 +12,31 @@ const api = axios.create({
   },
 });
 
-export const getTrendingMovies = async () => {
-  const response = await api.get('/trending/movie/week');
+export const getTrendingMovies = async (page: number = 1) => {
+  const response = await api.get('/trending/movie/week', {
+    params: { page }
+  });
   return response.data;
 };
 
-export const getPopularMovies = async () => {
-  const response = await api.get('/movie/popular');
+export const getPopularMovies = async (page: number = 1) => {
+  const response = await api.get('/movie/popular', {
+    params: { page }
+  });
   return response.data;
 };
 
-export const getTopRatedMovies = async () => {
-  const response = await api.get('/movie/top_rated');
+export const getTopRatedMovies = async (page: number = 1) => {
+  const response = await api.get('/movie/top_rated', {
+    params: { page }
+  });
   return response.data;
 };
 
-export const getUpcomingMovies = async () => {
-  const response = await api.get('/movie/upcoming');
+export const getUpcomingMovies = async (page: number = 1) => {
+  const response = await api.get('/movie/upcoming', {
+    params: { page }
+  });
   return response.data.results;
 };
 
@@ -94,4 +102,60 @@ export const getMovieDetails = async (id: number) => {
 export const getTVDetails = async (id: number) => {
   const response = await api.get(`/tv/${id}`);
   return response.data;
+};
+
+export const getMovieCredits = async (id: number) => {
+  const response = await api.get(`/movie/${id}/credits`);
+  return response.data;
+};
+
+export const getSimilarMovies = async (id: number) => {
+  const response = await api.get(`/movie/${id}/similar`);
+  return response.data;
+};
+
+export const getRecommendedMovies = async (id: number) => {
+  const response = await api.get(`/movie/${id}/recommendations`);
+  return response.data;
+};
+
+// Helper functions to fetch multiple pages of movies
+export const getMultiplePagesTrending = async (pages: number = 3, startPage: number = 1) => {
+  const promises = [];
+  for (let i = startPage; i < startPage + pages; i++) {
+    promises.push(getTrendingMovies(i));
+  }
+  const results = await Promise.all(promises);
+  const allMovies = results.flatMap(result => result.results);
+  return allMovies;
+};
+
+export const getMultiplePagesPopular = async (pages: number = 3, startPage: number = 1) => {
+  const promises = [];
+  for (let i = startPage; i < startPage + pages; i++) {
+    promises.push(getPopularMovies(i));
+  }
+  const results = await Promise.all(promises);
+  const allMovies = results.flatMap(result => result.results);
+  return allMovies;
+};
+
+export const getMultiplePagesTopRated = async (pages: number = 3, startPage: number = 1) => {
+  const promises = [];
+  for (let i = startPage; i < startPage + pages; i++) {
+    promises.push(getTopRatedMovies(i));
+  }
+  const results = await Promise.all(promises);
+  const allMovies = results.flatMap(result => result.results);
+  return allMovies;
+};
+
+export const getMultiplePagesUpcoming = async (pages: number = 3, startPage: number = 1) => {
+  const promises = [];
+  for (let i = startPage; i < startPage + pages; i++) {
+    promises.push(getUpcomingMovies(i));
+  }
+  const results = await Promise.all(promises);
+  const allMovies = results.flat();
+  return allMovies;
 };

@@ -1,290 +1,282 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-    fetchAiringTodayTVShows,
-    fetchOnTheAirTVShows,
-    fetchPopularTVShows,
-    fetchTopRatedTVShows,
-    fetchTrendingTVShows,
-    fetchTVGenres,
-    fetchTVShowsByGenre,
-    Genre,
-    searchTVShows,
-    TVShow
-} from '../../api/tmdb';
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { Footer } from '../../components/Footer';
+import { Header } from '../../components/Header';
 import { MovieCard } from '../../components/MovieCard';
 import { Sidebar } from '../../components/Sidebar';
+import { TrailerModal } from '../../components/TrailerModal';
+import { UniversalHero } from '../../components/UniversalHero';
+import { useAuth } from '../../context/AuthContext';
+import { Movie, TVShow } from '../../types';
+import {
+  tvAPI
+} from '../../src/api/tmdbApi';
 
-const categories = ['Trending', 'Popular', 'Top Rated', 'On The Air', 'Airing Today'];
+const { width } = Dimensions.get('window');
+const categories = ['Popular', 'Top Rated', 'On The Air', 'Airing Today'];
 
 export default function TVSeriesScreen() {
+  const router = useRouter();
+  const { isLoggedIn } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
-  const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tvShows, setTvShows] = useState<TVShow[]>([]);
-  const [genres, setGenres] = useState<Genre[]>([]);
+  const [allShows, setAllShows] = useState<TVShow[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+  const [trailerModalVisible, setTrailerModalVisible] = useState(false);
+  const [selectedShow, setSelectedShow] = useState<TVShow | null>(null);
+  const [showingAll, setShowingAll] = useState(false);
+
+  const INITIAL_LOAD = 80;
 
   useEffect(() => {
-    loadGenres();
     loadTVShows();
-  }, []);
-
-  useEffect(() => {
-    loadTVShows();
-  }, [selectedCategory, selectedGenre]);
-
-  const loadGenres = async () => {
-    try {
-      const genresData = await fetchTVGenres();
-      setGenres(genresData.genres);
-    } catch (error) {
-      console.error('Error loading genres:', error);
-    }
-  };
+  }, [selectedCategory]);
 
   const loadTVShows = async (page = 1, append = false) => {
     try {
-      setLoading(!append);
-      let tvData;
-      
-      if (selectedGenre) {
-        tvData = await fetchTVShowsByGenre(selectedGenre, page);
-      } else {
-        switch (selectedCategory) {
-          case 'Trending':
-            tvData = await fetchTrendingTVShows();
-            break;
-          case 'Popular':
-            tvData = await fetchPopularTVShows(page);
-            break;
-          case 'Top Rated':
-            tvData = await fetchTopRatedTVShows(page);
-            break;
-          case 'On The Air':
-            tvData = await fetchOnTheAirTVShows(page);
-            break;
-          case 'Airing Today':
-            tvData = await fetchAiringTodayTVShows(page);
-            break;
-          default:
-            tvData = await fetchPopularTVShows(page);
-        }
+      if (page === 1) {
+        setLoading(true);
       }
       
-      const newShows = tvData.results.map(show => ({
-        ...show,
-        isTV: true
-      }));
-
-      if (append) {
-        setTvShows(prev => [...prev, ...newShows]);
+      let showData;
+      
+      switch (selectedCategory) {
+        case 'Popular':
+          showData = await tvAPI.getPopular();
+          break;
+        case 'Top Rated':
+          showData = await tvAPI.getTopRated();
+          break;
+        case 'On The Air':
+          showData = await tvAPI.getOnTheAir();
+          break;
+        case 'Airing Today':
+          showData = await tvAPI.getAiringToday();
+          break;
+        default:
+          showData = await tvAPI.getPopular();
+      }
+      
+      const newShows = showData.results || showData;
+      setAllShows(newShows);
+      setTotalPages(showData.total_pages || 1);
+      
+      // Initially show only 80 shows
+      if (!searchQuery) {
+        setTvShows(newShows.slice(0, INITIAL_LOAD));
+        setShowingAll(false);
       } else {
         setTvShows(newShows);
       }
       
-      setHasMore(page < tvData.total_pages);
       setCurrentPage(page);
     } catch (error) {
       console.error('Error loading TV shows:', error);
-      Alert.alert('Error', 'Failed to load TV shows');
+      setTvShows([]);
+      setAllShows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      loadTVShows();
+  const handleShowPress = (show: TVShow) => {
+    router.push(`/modal?id=${show.id}`);
+  };
+
+  const handleWatchTrailer = (show: TVShow) => {
+    setSelectedShow(show);
+    setTrailerModalVisible(true);
+  };
+
+  const handleWatchShow = (show: TVShow) => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Login Required',
+        'Please log in to watch shows.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/profile') }
+        ]
+      );
       return;
     }
     
-    try {
-      setLoading(true);
-      const searchData = await searchTVShows(searchQuery);
-      const searchResults = searchData.results.map(show => ({
-        ...show,
-        isTV: true
-      }));
-      setTvShows(searchResults);
-    } catch (error) {
-      console.error('Error searching TV shows:', error);
-      Alert.alert('Error', 'Failed to search TV shows');
-    } finally {
-      setLoading(false);
-    }
+    Alert.alert('Watch Show', `Streaming ${show.name || show.original_name}`);
   };
 
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      loadTVShows(currentPage + 1, true);
-    }
+  const handleViewMore = () => {
+    setTvShows(allShows);
+    setShowingAll(true);
   };
 
-  const renderTVCard = ({ item }: { item: TVShow }) => (
-    <MovieCard
-      id={item.id}
-      title={item.name}
-      poster_path={item.poster_path}
-      vote_average={item.vote_average}
-      release_date={item.first_air_date}
-      overview={item.overview}
-      onPress={() => {}}
-      onWatchTrailer={() => {}}
-      onWatchMovie={() => {}}
-      onAddToWatchlist={() => {}}
-    />
+  const handleShowLess = () => {
+    setTvShows(allShows.slice(0, INITIAL_LOAD));
+    setShowingAll(false);
+  };
+
+  const closeTrailerModal = () => {
+    setTrailerModalVisible(false);
+    setSelectedShow(null);
+  };
+
+    const handleAddToWatchlist = (show: TVShow) => {
+    Alert.alert('Watchlist', `Added ${show.name || show.original_name} to your watchlist`);
+  };
+
+  const renderShowCard = ({ item }: { item: TVShow }) => (
+    <View style={styles.showCardWrapper}>
+      <MovieCard
+        id={item.id}
+        title={item.name || item.original_name}
+        poster_path={item.poster_path}
+        vote_average={item.vote_average}
+        release_date={item.first_air_date}
+        overview={item.overview}
+        onPress={() => handleShowPress(item)}
+        onWatchTrailer={() => handleWatchTrailer(item)}
+        onWatchMovie={() => handleWatchShow(item)}
+        onAddToWatchlist={() => handleAddToWatchlist(item)}
+      />
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={['#0a0a0a', '#1a1a1a', '#0a2a1a']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient
+        colors={['#0a0a0a', '#1a1a1a', '#0a2a1a']}
+        style={styles.gradient}
+      />
+      
+      <Header />
       
       <View style={styles.mainLayout}>
-        {/* Main Content */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#888" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search TV series..."
-              placeholderTextColor="#888"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  setSearchQuery('');
-                  loadTVShows();
-                }}
-              >
-                <Ionicons name="close" size={20} color="#888" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Category Filter */}
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Categories</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.filterButton,
-                    selectedCategory === category && styles.activeFilterButton
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory(category);
-                    setSelectedGenre(null);
-                  }}
-                >
-                  <Text style={[
-                    styles.filterText,
-                    selectedCategory === category && styles.activeFilterText
-                  ]}>
-                    {category}
-                  </Text>
+            <View style={styles.searchInputContainer}>
+              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search TV shows..."
+                placeholderTextColor="#666"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                  <Ionicons name="close" size={20} color="#666" />
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              ) : null}
+            </View>
           </View>
 
-          {/* Genre Filter */}
-          <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Genres</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+          {/* Hero Section */}
+          <UniversalHero currentPage="tv-series" />
+
+          {/* Category Filters */}
+          <View style={styles.categoriesContainer}>
+            {categories.map((category) => (
               <TouchableOpacity
+                key={category}
                 style={[
-                  styles.filterButton,
-                  selectedGenre === null && styles.activeFilterButton
+                  styles.categoryButton,
+                  selectedCategory === category && styles.activeCategoryButton
                 ]}
-                onPress={() => setSelectedGenre(null)}
+                onPress={() => setSelectedCategory(category)}
               >
-                <Text style={[
-                  styles.filterText,
-                  selectedGenre === null && styles.activeFilterText
-                ]}>
-                  All Genres
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    selectedCategory === category && styles.activeCategoryButtonText
+                  ]}
+                >
+                  {category}
                 </Text>
               </TouchableOpacity>
-              {genres.map((genre) => (
-                <TouchableOpacity
-                  key={genre.id}
-                  style={[
-                    styles.filterButton,
-                    selectedGenre === genre.id && styles.activeFilterButton
-                  ]}
-                  onPress={() => setSelectedGenre(genre.id)}
-                >
-                  <Text style={[
-                    styles.filterText,
-                    selectedGenre === genre.id && styles.activeFilterText
-                  ]}>
-                    {genre.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            ))}
           </View>
 
-          {/* TV Shows Section */}
-          <View style={styles.showsSection}>
-            <Text style={styles.sectionTitle}>
-              {searchQuery ? `Search Results for "${searchQuery}"` : 
-               selectedGenre ? genres.find(g => g.id === selectedGenre)?.name : selectedCategory}
+          {/* Results Header */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsTitle}>
+              {searchQuery ? `Search Results for "${searchQuery}"` : selectedCategory}
             </Text>
-            
-            {loading && tvShows.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#00d4aa" />
-                <Text style={styles.loadingText}>Loading TV series...</Text>
-              </View>
-            ) : (
-              <>
-                <FlatList
-                  data={tvShows}
-                  renderItem={renderTVCard}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={2}
-                  contentContainerStyle={styles.showsList}
-                  scrollEnabled={false}
-                  columnWrapperStyle={styles.row}
-                />
-                
-                {hasMore && (
-                  <View style={styles.loadMoreContainer}>
-                    <TouchableOpacity 
-                      style={styles.viewMoreButton} 
-                      onPress={loadMore}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.viewMoreText}>View More</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
-            )}
+            <Text style={styles.resultsCount}>
+              {tvShows.length} shows
+            </Text>
           </View>
+
+          {/* TV Shows Grid */}
+          {loading && currentPage === 1 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#00d4aa" />
+              <Text style={styles.loadingText}>Loading TV shows...</Text>
+            </View>
+          ) : (
+            <>
+              <FlatList
+                data={tvShows}
+                renderItem={renderShowCard}
+                keyExtractor={(item) => item.id.toString()}
+                numColumns={4}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.showsList}
+                columnWrapperStyle={styles.row}
+              />
+              
+              {/* View More / Show Less Button - Full width like the image */}
+              {!searchQuery && allShows.length > INITIAL_LOAD && (
+                !showingAll ? (
+                  <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMore}>
+                    <Text style={styles.fullWidthViewMoreText}>
+                      View more ({allShows.length - INITIAL_LOAD} more shows)
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleShowLess}>
+                    <Text style={styles.fullWidthViewMoreText}>Show Less</Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </>
+          )}
+
+          {/* Add some bottom padding */}
+          <View style={{ height: 100 }} />
           
-          <View style={{ height: 120 }} />
+          <Footer />
         </ScrollView>
 
         {/* Sidebar */}
-        <Sidebar isVisible={!loading || tvShows.length > 0} />
+        <Sidebar />
       </View>
+      
+      {/* Trailer Modal */}
+      <TrailerModal
+        visible={trailerModalVisible}
+        onClose={closeTrailerModal}
+        movieId={selectedShow?.id || null}
+        movieTitle={selectedShow?.name || selectedShow?.original_name || ''}
+      />
     </SafeAreaView>
   );
 }
@@ -292,7 +284,9 @@ export default function TVSeriesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+  },
+  gradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   mainLayout: {
     flex: 1,
@@ -300,111 +294,136 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: 20,
   },
   searchContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
     borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.3)',
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    color: '#FFFFFF',
-    marginLeft: 10,
+    color: '#fff',
     fontSize: 16,
   },
-  filterSection: {
-    marginBottom: 20,
+  clearButton: {
+    padding: 5,
   },
-  filterTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    paddingHorizontal: 20,
-    marginBottom: 10,
+  categoriesContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
+    flexWrap: 'wrap',
   },
-  filterContainer: {
-    paddingHorizontal: 20,
-  },
-  filterButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 18,
+  categoryButton: {
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    marginRight: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.2)',
+    borderColor: 'rgba(0, 212, 170, 0.3)',
   },
-  activeFilterButton: {
+  activeCategoryButton: {
     backgroundColor: '#00d4aa',
     borderColor: '#00d4aa',
   },
-  filterText: {
-    color: '#CCCCCC',
+  categoryButtonText: {
+    color: '#ccc',
     fontSize: 14,
-    fontWeight: '500',
-  },
-  activeFilterText: {
-    color: '#000000',
     fontWeight: '600',
   },
-  showsSection: {
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
+  activeCategoryButtonText: {
+    color: '#000',
     fontWeight: 'bold',
-    marginBottom: 20,
-    textShadowColor: 'rgba(0, 212, 170, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 212, 170, 0.2)',
+  },
+  resultsTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  resultsCount: {
+    color: '#00d4aa',
+    fontSize: 14,
   },
   showsList: {
-    paddingBottom: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 16,
   },
   row: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 5,
+    justifyContent: 'center',
+    gap: 16,
+  },
+  showCardWrapper: {
+    width: 280,
+    marginVertical: 8,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: 100,
   },
   loadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#fff',
     marginTop: 10,
+    fontSize: 16,
   },
-  loadMoreContainer: {
-    alignItems: 'center',
+  viewMoreContainer: {
+    paddingHorizontal: 20,
     paddingVertical: 20,
+    alignItems: 'center',
   },
   viewMoreButton: {
-    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+    backgroundColor: '#00d4aa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    paddingHorizontal: 30,
     borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.5)',
-    elevation: 3,
-    shadowColor: '#00d4aa',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    gap: 8,
   },
   viewMoreText: {
-    color: '#00d4aa',
-    fontSize: 14,
+    color: '#000',
+    fontSize: 16,
     fontWeight: '600',
+  },
+  fullWidthViewMoreButton: {
+    backgroundColor: '#00d4aa',
+    marginHorizontal: 16,
+    marginVertical: 20,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullWidthViewMoreText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingMoreText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });

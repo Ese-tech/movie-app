@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     Dimensions,
     FlatList,
@@ -10,28 +10,84 @@ import {
     View,
 } from 'react-native';
 import { Movie } from '../types';
-import
-{MovieCard} from './MovieCard';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width * 0.32; // Narrower cards - 32% of screen width
-const CARD_HEIGHT = CARD_WIDTH * 1.8; // Taller aspect ratio for movie posters
-const CARD_MARGIN = 8;
+const CARD_WIDTH = width * 0.28; // Slightly narrower cards - 28% of screen width
+const CARD_HEIGHT = CARD_WIDTH * 1.9; // Taller aspect ratio for movie posters
+const CARD_MARGIN = 12; // More spacing between cards
 
 interface HorizontalMovieCarouselProps {
   title: string;
   movies: Movie[];
   onMoviePress?: (movie: Movie) => void;
+  onWatchTrailer?: (movie: Movie) => void;
+  onWatchMovie?: (movie: Movie) => void;
   onViewMore?: () => void;
+  onLoadMore?: () => Promise<Movie[]>; // New prop for loading more movies
+  initialDisplayCount?: number; // How many movies to show initially
 }
 
 export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = ({
   title,
   movies,
   onMoviePress,
+  onWatchTrailer,
+  onWatchMovie,
   onViewMore,
+  onLoadMore,
+  initialDisplayCount = 4,
 }) => {
   const flatListRef = useRef<FlatList>(null);
+  const [displayCount, setDisplayCount] = useState(initialDisplayCount);
+  const [allMovies, setAllMovies] = useState(movies);
+  const [loading, setLoading] = useState(false);
+
+  // Update allMovies when props.movies changes
+  React.useEffect(() => {
+    setAllMovies(movies);
+  }, [movies]);
+
+  const handleViewMore = async () => {
+    if (onLoadMore) {
+      // If onLoadMore is provided, fetch more movies
+      setLoading(true);
+      try {
+        const moreMovies = await onLoadMore();
+        setAllMovies(prev => [...prev, ...moreMovies]);
+        setDisplayCount(prev => prev + 4); // Show 4 more movies
+      } catch (error) {
+        console.error('Error loading more movies:', error);
+      } finally {
+        setLoading(false);
+      }
+    } else if (allMovies.length > displayCount) {
+      // If we have more movies in the current array, show 4 more
+      setDisplayCount(prev => Math.min(prev + 4, allMovies.length));
+      
+      // Scroll to show the new movies
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: Math.min(displayCount, allMovies.length - 4),
+          animated: true,
+        });
+      }, 100);
+    } else if (onViewMore) {
+      // Fallback to original behavior
+      onViewMore();
+    }
+  };
+
+  const handleShowLess = () => {
+    setDisplayCount(initialDisplayCount);
+    flatListRef.current?.scrollToIndex({
+      index: 0,
+      animated: true,
+    });
+  };
+
+  const currentMovies = allMovies.slice(0, displayCount);
+  const hasMoreToShow = allMovies.length > displayCount;
+  const canShowLess = displayCount > initialDisplayCount;
 
   const renderMovieCard = ({ item }: { item: Movie }) => (
     <TouchableOpacity 
@@ -81,19 +137,29 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
             {item.overview || 'No description available.'}
           </Text>
           
-          <TouchableOpacity 
-            style={styles.watchButton}
-            onPress={() => onMoviePress?.(item)}
-          >
-            <LinearGradient
-              colors={['#00d4aa', '#FFD700']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.watchButtonGradient}
+          {/* Action Buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.trailerButton]}
+              onPress={() => onWatchTrailer?.(item)}
             >
-              <Text style={styles.watchButtonText}>▶ Watch Movie</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Text style={styles.trailerButtonText}>▶ Trailer</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.watchButton]}
+              onPress={() => onWatchMovie?.(item)}
+            >
+              <LinearGradient
+                colors={['#00d4aa', '#FFD700']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.watchButtonGradient}
+              >
+                <Text style={styles.watchButtonText}>▶ Watch</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -104,17 +170,30 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
       {/* Section Header */}
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
-        {onViewMore && (
-          <TouchableOpacity onPress={onViewMore} style={styles.viewMoreButton}>
-            <Text style={styles.viewMoreText}>View More ›</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {hasMoreToShow && (
+            <TouchableOpacity 
+              onPress={handleViewMore} 
+              style={[styles.viewMoreButton, loading && styles.disabledButton]}
+              disabled={loading}
+            >
+              <Text style={styles.viewMoreText}>
+                {loading ? 'Loading...' : 'View More ›'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {canShowLess && (
+            <TouchableOpacity onPress={handleShowLess} style={styles.showLessButton}>
+              <Text style={styles.showLessText}>‹ Show Less</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
       
       {/* Horizontal Carousel */}
       <FlatList
         ref={flatListRef}
-        data={movies}
+        data={currentMovies}
         renderItem={renderMovieCard}
         keyExtractor={(item) => item.id.toString()}
         horizontal
@@ -124,14 +203,34 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
         snapToInterval={CARD_WIDTH + CARD_MARGIN * 2}
         contentContainerStyle={styles.carouselContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        onScrollToIndexFailed={(info) => {
+          // Handle scroll to index failed gracefully
+          const wait = new Promise(resolve => setTimeout(resolve, 500));
+          wait.then(() => {
+            flatListRef.current?.scrollToIndex({ 
+              index: Math.min(info.index, currentMovies.length - 1), 
+              animated: true 
+            });
+          });
+        }}
       />
+      
+      {/* Movie count indicator */}
+      <View style={styles.countIndicator}>
+        <Text style={styles.countText}>
+          Showing {currentMovies.length} of {allMovies.length} {title.toLowerCase()}
+        </Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 20,
+    width: 1600,
+    marginVertical: 20,  
+    paddingHorizontal: 70,
+
   },
   header: {
     flexDirection: 'row',
@@ -153,15 +252,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  carouselContent: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  showLessButton: {
+    padding: 8,
+  },
+  showLessText: {
+    color: '#ff6b6b',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  countIndicator: {
     paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  countText: {
+    color: '#888',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  carouselContent: {
+    
+    width: 1500,
+    justifyContent: `space-around`,
+    flex: 1,
   },
   separator: {
-    width: CARD_MARGIN,
+    width: 75,
   },
   movieCard: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    width: 280,
+    height: 570,
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     overflow: 'hidden',
@@ -170,13 +297,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  marginRight: 30,
   },
   movieContainer: {
     flex: 1,
+   
   },
   imageContainer: {
     position: 'relative',
-    height: CARD_HEIGHT * 0.7, // 70% of card height for image
+    height: 450 // 70% of card height for image
   },
   movieImage: {
     width: '100%',
@@ -255,6 +384,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     flex: 1,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  trailerButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  trailerButtonText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
   watchButton: {
     borderRadius: 4,
     overflow: 'hidden',
@@ -266,7 +415,7 @@ const styles = StyleSheet.create({
   },
   watchButtonText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
   },
 });

@@ -1,208 +1,316 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, ImageBackground, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fetchPopularMovies, fetchTopRatedMovies, fetchTrendingMovies, getBackdropUrl, Movie } from '../../api/tmdb';
-import { MovieCard } from '../../components/MovieCard';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { HorizontalMovieCarousel } from '../../components/HorizontalMovieCarousel';
 import { Sidebar } from '../../components/Sidebar';
+import { TrailerModal } from '../../components/TrailerModal';
 import { useAuth } from '../../context/AuthContext';
+import { Movie } from '../../types';
+import {
+  trendingAPI,
+  movieAPI,
+  getMultiplePagesTrending,
+  getMultiplePagesPopular,
+  getMultiplePagesTopRated,
+  getMultiplePagesUpcoming
+} from '../../src/api/tmdbApi';
 
-export default function HomeScreen() {
-  const { isLoggedIn } = useAuth();
+const { width } = Dimensions.get('window');
+
+export default function TabHomeScreen() {
   const router = useRouter();
-  
-  const [trendingMovies, setTrendingMovies] = useState<Movie[]>([]);
-  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
-  const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
-  const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
+  const { isLoggedIn } = useAuth();
+  const [trending, setTrending] = useState<Movie[]>([]);
+  const [popular, setPopular] = useState<Movie[]>([]);
+  const [topRated, setTopRated] = useState<Movie[]>([]);
+  const [upcoming, setUpcoming] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [trailerModalVisible, setTrailerModalVisible] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [heroImages, setHeroImages] = useState<string[]>([]);
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+
+  // Rotate hero background every 20 seconds
+  useEffect(() => {
+    if (heroImages.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentHeroIndex((prev) => (prev + 1) % heroImages.length);
+      }, 20000); // 20 seconds as requested
+      return () => clearInterval(interval);
+    }
+  }, [heroImages]);
 
   useEffect(() => {
-    loadMovieData();
+    loadMovies();
   }, []);
 
-  const loadMovieData = async () => {
+  const loadMovies = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      const [trendingData, popularData, topRatedData] = await Promise.all([
-        fetchTrendingMovies(),
-        fetchPopularMovies(),
-        fetchTopRatedMovies()
+      const [trendingData, popularData, topRatedData, upcomingData] = await Promise.all([
+        getMultiplePagesTrending(3), // Fetch 3 pages = ~60 movies
+        getMultiplePagesPopular(3),  // Fetch 3 pages = ~60 movies  
+        getMultiplePagesTopRated(3), // Fetch 3 pages = ~60 movies
+        getMultiplePagesUpcoming(2)  // Fetch 2 pages = ~40 movies
       ]);
-
-      setTrendingMovies(trendingData.results.slice(0, 10));
-      setPopularMovies(popularData.results.slice(0, 10));
-      setTopRatedMovies(topRatedData.results.slice(0, 10));
       
-      // Set the first trending movie as featured
-      if (trendingData.results.length > 0) {
-        setFeaturedMovie(trendingData.results[0]);
-      }
+      setTrending(trendingData);
+      setPopular(popularData);
+      setTopRated(topRatedData);
+      setUpcoming(upcomingData);
 
-    } catch (err) {
-      console.error('Error loading movie data:', err);
-      setError('Failed to load movies. Please check your internet connection.');
+      // Set hero images from trending movies (latest 6 movies)
+      const images = trendingData
+        .slice(0, 6)
+        .map((movie: Movie) => 
+          movie.backdrop_path 
+            ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
+            : `https://image.tmdb.org/t/p/w1280${movie.poster_path}`
+        )
+        .filter(Boolean);
+      setHeroImages(images);
+    } catch (error) {
+      console.error('Error loading movies:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleMoviePress = (movie: Movie) => {
-    // Navigate to movie details modal
-    router.push('/modal');
+    router.push(`/modal?id=${movie.id}`);
   };
 
   const handleWatchTrailer = (movie: Movie) => {
-    Alert.alert('Watch Trailer', `Playing trailer for ${movie.title}`);
+    setSelectedMovie(movie);
+    setTrailerModalVisible(true);
   };
 
   const handleWatchMovie = (movie: Movie) => {
-    if (isLoggedIn) {
-      Alert.alert('Watch Movie', `Streaming ${movie.title}`);
-    } else {
-      Alert.alert('Login Required', 'Please sign in to watch movies');
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Login Required',
+        'Please log in to watch movies.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/profile') }
+        ]
+      );
+      return;
+    }
+    
+    router.push(`/modal?id=${movie.id}`);
+  };
+
+  const closeTrailerModal = () => {
+    setTrailerModalVisible(false);
+    setSelectedMovie(null);
+  };
+
+  const handleViewMoreTrending = () => {
+    router.push('/(tabs)/movies?category=Latest');
+  };
+
+  const handleViewMorePopular = () => {
+    router.push('/(tabs)/movies?category=Popular');
+  };
+
+  const handleViewMoreUpcoming = () => {
+    router.push('/(tabs)/movies?category=Upcoming');
+  };
+
+  const handleLoadMoreTrending = async (): Promise<Movie[]> => {
+    try {
+      const additionalMovies = await trendingAPI.movies('week', 2);
+      const newMovies = additionalMovies.results || [];
+      return newMovies.slice(10, 20); // Get next 10 movies
+    } catch (error) {
+      console.error('Error loading more trending movies:', error);
+      return [];
     }
   };
 
-  const handleAddToWatchlist = (movie: Movie) => {
-    Alert.alert('Watchlist', `Added ${movie.title} to your watchlist`);
+  const handleLoadMorePopular = async (): Promise<Movie[]> => {
+    try {
+      const additionalMovies = await movieAPI.getPopular(2);
+      const newMovies = additionalMovies.results || [];
+      return newMovies.slice(10, 20); // Get next 10 movies
+    } catch (error) {
+      console.error('Error loading more popular movies:', error);
+      return [];
+    }
   };
 
-  const renderMovieCard = ({ item }: { item: Movie }) => (
-    <MovieCard
-      id={item.id}
-      title={item.title}
-      poster_path={item.poster_path}
-      vote_average={item.vote_average}
-      release_date={item.release_date}
-      overview={item.overview}
-      onPress={() => handleMoviePress(item)}
-      onWatchTrailer={() => handleWatchTrailer(item)}
-      onWatchMovie={() => handleWatchMovie(item)}
-      onAddToWatchlist={() => handleAddToWatchlist(item)}
-    />
-  );
+  const handleLoadMoreTopRated = async (): Promise<Movie[]> => {
+    try {
+      const additionalMovies = await movieAPI.getTopRated(2);
+      const newMovies = additionalMovies.results || [];
+      return newMovies.slice(10, 20); // Get next 10 movies
+    } catch (error) {
+      console.error('Error loading more top rated movies:', error);
+      return [];
+    }
+  };
 
-  const renderMovieRow = (title: string, movies: Movie[]) => (
-    <View style={styles.movieRow}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <FlatList
-        horizontal
-        data={movies}
-        renderItem={renderMovieCard}
-        keyExtractor={(item) => item.id.toString()}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.movieList}
-      />
-    </View>
-  );
+  const handleLoadMoreUpcoming = async (): Promise<Movie[]> => {
+    try {
+      const additionalMovies = await movieAPI.getUpcoming(2);
+      const newMovies = additionalMovies.results || [];
+      return newMovies.slice(10, 20); // Get next 10 movies
+    } catch (error) {
+      console.error('Error loading more upcoming movies:', error);
+      return [];
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={['#0A0F28', '#1A1F3A']} style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00d4aa" />
+            <Text style={styles.loadingText}>Loading movies...</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#0a0a0a', '#1a1a1a', '#0a2a1a']}
-        style={StyleSheet.absoluteFillObject}
-      />
-      
-      <View style={styles.mainLayout}>
-        {/* Main Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#00d4aa" />
-              <Text style={styles.loadingText}>Loading movies...</Text>
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={loadMovieData}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              {/* Featured Movie Section */}
-              {featuredMovie && (
-                <View style={styles.featuredSection}>
-                  <ImageBackground
-                    source={{ uri: getBackdropUrl(featuredMovie.backdrop_path || featuredMovie.poster_path || '') }}
-                    style={styles.featuredBackground}
-                    resizeMode="cover"
-                  >
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.6)', 'rgba(10,10,10,0.9)']}
-                      style={styles.featuredGradient}
-                    >
-                      <View style={styles.featuredContent}>
-                        <View style={styles.featuredBadge}>
-                          <Text style={styles.featuredBadgeText}>FEATURED</Text>
-                        </View>
-                        <Text style={styles.featuredTitle}>{featuredMovie.title}</Text>
-                        <View style={styles.featuredMeta}>
-                          <View style={styles.ratingContainer}>
-                            <Ionicons name="star" size={16} color="#FFD700" />
-                            <Text style={styles.featuredRating}>
-                              {featuredMovie.vote_average.toFixed(1)}
-                            </Text>
-                          </View>
-                          <Text style={styles.featuredYear}>
-                            {new Date(featuredMovie.release_date).getFullYear()}
-                          </Text>
-                          <View style={styles.qualityBadge}>
-                            <Text style={styles.qualityBadgeText}>4K</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.featuredOverview} numberOfLines={3}>
-                          {featuredMovie.overview}
-                        </Text>
-                        <View style={styles.featuredButtons}>
-                          <TouchableOpacity 
-                            style={styles.playButton}
-                            onPress={() => handleWatchMovie(featuredMovie)}
-                          >
-                            <LinearGradient
-                              colors={['#00d4aa', '#00b894']}
-                              style={styles.playButtonGradient}
-                            >
-                              <Ionicons name="play" size={20} color="#000000" />
-                              <Text style={styles.playButtonText}>Watch Trailer</Text>
-                              <Text style={styles.playButtonText}>Watch Movie</Text>
-                            </LinearGradient>
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={styles.infoButton}
-                            onPress={() => handleMoviePress(featuredMovie)}
-                          >
-                            <View style={styles.infoButtonContent}>
-                              <Ionicons name="information-circle-outline" size={20} color="#FFD700" />
-                              <Text style={styles.infoButtonText}>More Info</Text>
-                            </View>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </ImageBackground>
+      <LinearGradient colors={['#0A0F28', '#1A1F3A']} style={styles.container}>
+        <View style={styles.mainLayout}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Hero Section with rotating movie backgrounds */}
+            <View style={styles.heroSection}>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.3)']}
+                style={styles.heroOverlay}
+              />
+              {heroImages.length > 0 && (
+                <View style={styles.heroImageContainer}>
+                  {heroImages.map((imageUrl, index) => (
+                    <Image
+                      key={index}
+                      source={{ uri: imageUrl }}
+                      style={[
+                        styles.heroImage,
+                        {
+                          opacity: index === currentHeroIndex ? 1 : 0,
+                        }
+                      ]}
+                      resizeMode="cover"
+                    />
+                  ))}
                 </View>
               )}
-
-              <View style={styles.sectionsContainer}>
-                {renderMovieRow("🔥 Trending Now", trendingMovies)}
-                {renderMovieRow("⭐ Popular Movies", popularMovies)}
-                {renderMovieRow("🏆 Top Rated", topRatedMovies)}
+              <View style={styles.heroContent}>
+                <Text style={styles.heroTitle}>ZERO -The Bravest Money Game-</Text>
+                <View style={styles.heroMeta}>
+                  <Text style={styles.heroRating}>7.8/10</Text>
+                  <Text style={styles.heroYear}>2018</Text>
+                  <View style={styles.heroQuality}>
+                    <Text style={styles.heroQualityText}>HD</Text>
+                  </View>
+                  <View style={styles.heroBadge}>
+                    <Text style={styles.heroBadgeText}>SÉRIE</Text>
+                  </View>
+                </View>
+                <Text style={styles.heroDescription}>
+                  The winner of a secret survival game stands to win a large sum of money. However, one player does not seem to be in the game for the money.
+                </Text>
+                <TouchableOpacity style={styles.heroButton}>
+                  <Text style={styles.heroButtonText}>▶ Watch Serie</Text>
+                </TouchableOpacity>
               </View>
-            </>
-          )}
-          
-          <View style={{ height: 120 }} />
-        </ScrollView>
+              {/* Carousel indicators */}
+              <View style={styles.heroIndicators}>
+                {heroImages.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentHeroIndex && styles.activeIndicator
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
 
-        {/* Sidebar */}
-        <Sidebar isVisible={!loading && !error} />
-      </View>
+            {/* Movie Carousels */}
+            <View style={styles.moviesSection}>
+              <HorizontalMovieCarousel
+                title="Trending Now"
+                movies={trending}
+                onMoviePress={handleMoviePress}
+                onWatchTrailer={handleWatchTrailer}
+                onWatchMovie={handleWatchMovie}
+                onViewMore={handleViewMoreTrending}
+                onLoadMore={handleLoadMoreTrending}
+                initialDisplayCount={4}
+              />
+
+              <HorizontalMovieCarousel
+                title="Popular Movies"
+                movies={popular}
+                onMoviePress={handleMoviePress}
+                onWatchTrailer={handleWatchTrailer}
+                onWatchMovie={handleWatchMovie}
+                onViewMore={handleViewMorePopular}
+                onLoadMore={handleLoadMorePopular}
+                initialDisplayCount={4}
+              />
+
+              <HorizontalMovieCarousel
+                title="Top Rated"
+                movies={topRated}
+                onMoviePress={handleMoviePress}
+                onWatchTrailer={handleWatchTrailer}
+                onWatchMovie={handleWatchMovie}
+                onViewMore={handleViewMorePopular}
+                onLoadMore={handleLoadMoreTopRated}
+                initialDisplayCount={4}
+              />
+
+              <HorizontalMovieCarousel
+                title="Coming Soon"
+                movies={upcoming}
+                onMoviePress={handleMoviePress}
+                onWatchTrailer={handleWatchTrailer}
+                onWatchMovie={handleWatchMovie}
+                onViewMore={handleViewMoreUpcoming}
+                onLoadMore={handleLoadMoreUpcoming}
+                initialDisplayCount={4}
+              />
+            </View>
+
+            {/* Add some bottom padding */}
+            <View style={{ height: 100 }} />
+          </ScrollView>
+
+          {/* Sidebar */}
+          <Sidebar />
+        </View>
+
+        {/* Trailer Modal */}
+        <TrailerModal
+          visible={trailerModalVisible}
+          onClose={closeTrailerModal}
+          movieId={selectedMovie?.id || null}
+          movieTitle={selectedMovie?.title || ''}
+        />
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -210,7 +318,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0A0F28',
   },
   mainLayout: {
     flex: 1,
@@ -219,160 +327,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  featuredSection: {
-    height: 500,
-    position: 'relative',
-  },
-  featuredBackground: {
-    width: '100%',
-    height: '100%',
-  },
-  featuredGradient: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  featuredContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  featuredBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 15,
-    elevation: 5,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  featuredBadgeText: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  featuredTitle: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  featuredMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-    gap: 15,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  featuredRating: {
-    color: '#FFD700',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  featuredYear: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  qualityBadge: {
-    backgroundColor: 'rgba(0, 212, 170, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#00d4aa',
-  },
-  qualityBadgeText: {
-    color: '#00d4aa',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  featuredOverview: {
-    color: '#DDDDDD',
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 25,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  featuredButtons: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  playButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#00d4aa',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-  },
-  playButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-  },
-  playButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  infoButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 215, 0, 0.5)',
-    overflow: 'hidden',
-  },
-  infoButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  infoButtonText: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  sectionsContainer: {
-    paddingTop: 30,
-  },
-  movieRow: {
-    marginBottom: 35,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: 'bold',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    textShadowColor: 'rgba(0, 212, 170, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  movieList: {
-    paddingLeft: 20,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -380,32 +334,139 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   loadingText: {
-    color: '#FFFFFF',
+    color: '#fff',
+    marginTop: 10,
     fontSize: 16,
-    marginTop: 15,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  heroSection: {
+    height: 400,
+    margin: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    position: 'relative',
+    backgroundColor: '#1a1a2e',
+  },
+  heroImageContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1a1a2e',
+  },
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  heroContent: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    zIndex: 2,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 8,
+  },
+  heroMeta: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 100,
-    paddingHorizontal: 20,
+    marginBottom: 8,
+    gap: 8,
   },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 25,
+  heroRating: {
+    color: '#FFD700',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
-  retryButton: {
+  heroYear: {
+    color: '#ccc',
+    fontSize: 14,
+  },
+  heroQuality: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  heroQualityText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  heroBadge: {
     backgroundColor: '#00d4aa',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  retryButtonText: {
-    color: '#000000',
+  heroBadgeText: {
+    color: '#000',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  heroDescription: {
+    color: '#ccc',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+    maxWidth: '90%',
+  },
+  heroButton: {
+    backgroundColor: '#00d4aa',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignSelf: 'flex-start',
+  },
+  heroButtonText: {
+    color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  heroIndicators: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 2,
+  },
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  activeIndicator: {
+    backgroundColor: '#00d4aa',
+  },
+  moviesSection: {
+    flex: 1,
+    paddingBottom: 20,
+    paddingTop: 20,
   },
 });
