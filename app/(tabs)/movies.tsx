@@ -22,12 +22,12 @@ import { Sidebar } from '../../components/Sidebar';
 import { TrailerModal } from '../../components/TrailerModal';
 import { UniversalHero } from '../../components/UniversalHero';
 import { useAuth } from '../../context/AuthContext';
-import { Movie } from '../../types';
 import {
   movieAPI,
-  trendingAPI,
-  searchAPI
+  searchAPI,
+  trendingAPI
 } from '../../src/api/tmdbApi';
+import { Movie } from '../../types';
 
 const { width } = Dimensions.get('window');
 const categories = ['Latest', 'Popular', 'Upcoming'];
@@ -324,15 +324,33 @@ export default function MoviesScreen() {
                   <Text style={styles.loadingText}>Searching movies...</Text>
                 </View>
               ) : (
-                <FlatList
-                  data={movies}
-                  renderItem={renderMovieCard}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={4}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.moviesList}
-                  columnWrapperStyle={styles.row}
-                />
+                <>
+                  <FlatList
+                    data={movies}
+                    renderItem={renderMovieCard}
+                    keyExtractor={(item) => item.id.toString()}
+                    numColumns={width > 1200 ? 4 : width > 768 ? 3 : 2}
+                    key={`movies-${width > 1200 ? 4 : width > 768 ? 3 : 2}`}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.moviesList}
+                    columnWrapperStyle={styles.row}
+                  />
+                  
+                  {/* View More Button - Always show if there are more movies */}
+                  {allMovies.length > INITIAL_LOAD && (
+                    !showingAll ? (
+                      <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMore}>
+                        <Text style={styles.fullWidthViewMoreText}>
+                          View more ({allMovies.length - INITIAL_LOAD} more movies)
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleShowLess}>
+                        <Text style={styles.fullWidthViewMoreText}>Show Less</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </>
               )}
             </>
           ) : (
@@ -385,11 +403,19 @@ export default function MoviesScreen() {
                     columnWrapperStyle={styles.row}
                   />
                   
-                  {/* View More Button - Full width like the image */}
-                  {!showingAll && allMovies.length > INITIAL_LOAD && (
-                    <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMore}>
-                      <Text style={styles.fullWidthViewMoreText}>View more</Text>
-                    </TouchableOpacity>
+                  {/* View More Button - Full width */}
+                  {!searchQuery && allMovies.length > INITIAL_LOAD && (
+                    !showingAll ? (
+                      <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMore}>
+                        <Text style={styles.fullWidthViewMoreText}>
+                          View more ({allMovies.length - INITIAL_LOAD} more movies)
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleShowLess}>
+                        <Text style={styles.fullWidthViewMoreText}>Show Less</Text>
+                      </TouchableOpacity>
+                    )
                   )}
                 </>
               )}
@@ -402,8 +428,8 @@ export default function MoviesScreen() {
            <Footer />
         </ScrollView>
 
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Sidebar - only show on large screens */}
+        {width >= 1200 && <Sidebar  />}
       </View>
       
       {/* Trailer Modal */}
@@ -427,9 +453,12 @@ const styles = StyleSheet.create({
   mainLayout: {
     flex: 1,
     flexDirection: 'row',
+    width: '100%',
   },
   content: {
     flex: 1,
+    minWidth: 0,
+    // No margin needed, sidebar is fixed width and in flex row
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -552,8 +581,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   movieCard: {
-    width: 280,
-    height: 570,
+    width: width > 1200 ? 280 : width > 768 ? 240 : width * 0.45,
+    height: width > 1200 ? 570 : width > 768 ? 480 : width * 0.85,
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     overflow: 'hidden',
@@ -562,14 +591,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    marginRight: 30,
+    marginRight: width > 768 ? 20 : 10,
   },
   movieContainer: {
     flex: 1,
   },
   imageContainer: {
     position: 'relative',
-    height: 450, // 70% of card height for image
+    height: width > 1200 ? 450 : width > 768 ? 360 : width * 0.6,
   },
   movieImage: {
     width: '100%',
@@ -706,6 +735,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     alignItems: 'center',
+    borderColor: 'rgba(228, 15, 15, 1)',
   },
   viewMoreButton: {
     backgroundColor: '#00d4aa',
@@ -737,12 +767,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   separator: {
-    width: 75,
+    width: width > 768 ? 75 : 20,
   },
   categorySection: {
-    width: 1600,
+    width: '100%',
     marginVertical: 20,
-    paddingHorizontal: 70,
+    paddingHorizontal: width > 1200 ? 70 : width > 768 ? 20 : 16,
   },
   categoryHeader: {
     flexDirection: 'row',
@@ -762,8 +792,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   carouselContent: {
-    width: 1500,
-    justifyContent: 'space-around',
-    flex: 1,
+    paddingLeft: width > 768 ? 20 : 10,
+    paddingRight: width > 768 ? 20 : 10,
   },
 });

@@ -47,32 +47,21 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
     setAllMovies(movies);
   }, [movies]);
 
-  const handleViewMore = async () => {
-    if (onLoadMore) {
-      // If onLoadMore is provided, fetch more movies
-      setLoading(true);
-      try {
-        const moreMovies = await onLoadMore();
-        setAllMovies(prev => [...prev, ...moreMovies]);
-        setDisplayCount(prev => prev + 4); // Show 4 more movies
-      } catch (error) {
-        console.error('Error loading more movies:', error);
-      } finally {
-        setLoading(false);
-      }
-    } else if (allMovies.length > displayCount) {
-      // If we have more movies in the current array, show 4 more
-      setDisplayCount(prev => Math.min(prev + 4, allMovies.length));
+  const handleViewMore = () => {
+    if (allMovies.length > displayCount) {
+      // Show 4 more movies
+      const newDisplayCount = Math.min(displayCount + 4, allMovies.length);
+      setDisplayCount(newDisplayCount);
       
-      // Scroll to show the new movies
+      // Scroll to show the new movies after state update
       setTimeout(() => {
+        const scrollToIndex = Math.max(0, displayCount);
         flatListRef.current?.scrollToIndex({
-          index: Math.min(displayCount, allMovies.length - 4),
+          index: Math.min(scrollToIndex, newDisplayCount - 1),
           animated: true,
         });
       }, 100);
     } else if (onViewMore) {
-      // Fallback to original behavior
       onViewMore();
     }
   };
@@ -200,11 +189,9 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
         showsHorizontalScrollIndicator={false}
         snapToAlignment="start"
         decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + CARD_MARGIN * 2}
         contentContainerStyle={styles.carouselContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         onScrollToIndexFailed={(info) => {
-          // Handle scroll to index failed gracefully
           const wait = new Promise(resolve => setTimeout(resolve, 500));
           wait.then(() => {
             flatListRef.current?.scrollToIndex({ 
@@ -227,10 +214,9 @@ export const HorizontalMovieCarousel: React.FC<HorizontalMovieCarouselProps> = (
 
 const styles = StyleSheet.create({
   container: {
-    width: 1600,
-    marginVertical: 20,  
-    paddingHorizontal: 70,
-
+    width: '100%',
+    marginVertical: 20,
+    paddingHorizontal: width > 1200 ? 70 : width > 768 ? 20 : 16,
   },
   header: {
     flexDirection: 'row',
@@ -278,17 +264,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   carouselContent: {
-    
-    width: 1500,
-    justifyContent: `space-around`,
-    flex: 1,
+    paddingLeft: width > 768 ? 20 : 10,
+    paddingRight: width > 768 ? 20 : 10,
   },
   separator: {
-    width: 75,
+    width: width > 768 ? 75 : 20,
   },
   movieCard: {
-    width: 280,
-    height: 570,
+    width: width > 1200 ? 280 : width > 768 ? 240 : width * 0.45,
+    height: width > 1200 ? 570 : width > 768 ? 480 : width * 0.85,
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     overflow: 'hidden',
@@ -297,7 +281,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-  marginRight: 30,
+    marginRight: width > 768 ? 20 : 10,
   },
   movieContainer: {
     flex: 1,
@@ -305,7 +289,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    height: 450 // 70% of card height for image
+    height: width > 1200 ? 450 : width > 768 ? 360 : width * 0.6,
   },
   movieImage: {
     width: '100%',

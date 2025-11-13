@@ -2,7 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Footer } from '../../components/Footer';
 import { Header } from '../../components/Header';
 import { MovieCard } from '../../components/MovieCard';
@@ -10,8 +21,8 @@ import { Sidebar } from '../../components/Sidebar';
 import { TrailerModal } from '../../components/TrailerModal';
 import { UniversalHero } from '../../components/UniversalHero';
 import { useAuth } from '../../context/AuthContext';
-import { Movie } from '../../types';
 import { discoverAPI } from '../../src/api/tmdbApi';
+import { Movie } from '../../types';
 
 // Mock genres data - replace with TMDB API call
 const movieGenres = [
@@ -53,6 +64,8 @@ const tvGenres = [
   { id: 10768, name: 'War & Politics' },
   { id: 37, name: 'Western' },
 ];
+
+const { width } = Dimensions.get('window');
 
 const genreIcons: { [key: string]: string } = {
   'Action': '⚔️',
@@ -315,9 +328,10 @@ export default function GenresScreen() {
                     data={currentGenres}
                     renderItem={renderGenre}
                     keyExtractor={(item) => item.id.toString()}
-                    numColumns={2}
+                    numColumns={width > 768 ? 2 : 1}
+                    key={`genres-${width > 768 ? 2 : 1}`}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
-                    columnWrapperStyle={styles.row}
+                    columnWrapperStyle={width > 768 ? styles.row : undefined}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.genresList}
                     scrollEnabled={false}
@@ -356,16 +370,19 @@ export default function GenresScreen() {
                       data={movies}
                       renderItem={renderMovieCard}
                       keyExtractor={(item) => item.id.toString()}
-                      numColumns={4}
+                      numColumns={width > 1200 ? 4 : width > 768 ? 3 : 2}
+                      key={`genre-movies-${width > 1200 ? 4 : width > 768 ? 3 : 2}`}
                       showsVerticalScrollIndicator={false}
                       contentContainerStyle={styles.moviesList}
                       columnWrapperStyle={styles.moviesRow}
                     />
                     
-                    {/* View More Button - Full width */}
+                    {/* View More Button - Show if there are more movies */}
                     {!showingMore && allMovies.length > movies.length && (
                       <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMoreMovies}>
-                        <Text style={styles.fullWidthViewMoreText}>View more</Text>
+                        <Text style={styles.fullWidthViewMoreText}>
+                          View more ({allMovies.length - movies.length} more {selectedGenre?.name} {selectedType === 'movie' ? 'movies' : 'shows'})
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </>
@@ -380,7 +397,8 @@ export default function GenresScreen() {
           </ScrollView>
 
           {/* Sidebar */}
-          <Sidebar />
+          {/* Sidebar - only show on large screens */}
+          {width >= 1200 && <Sidebar />}
         </View>
 
         {/* Trailer Modal */}
@@ -406,6 +424,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -560,7 +579,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   movieCardWrapper: {
-    width: 280,
+    width: width > 1200 ? 280 : width > 768 ? 240 : width * 0.45,
     marginVertical: 8,
   },
   fullWidthViewMoreButton: {

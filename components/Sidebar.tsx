@@ -2,9 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Movie } from '../types';
+import {
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { movieAPI } from '../src/api/tmdbApi';
+import { Movie } from '../types';
+
+const { width } = Dimensions.get('window');
 
 interface SidebarProps {
   isVisible?: boolean;
@@ -15,40 +26,82 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
   const [mostViewed, setMostViewed] = useState<Movie[]>([]);
   const [recommended, setRecommended] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewedStartIndex, setViewedStartIndex] = useState(0);
+  const [recommendedStartIndex, setRecommendedStartIndex] = useState(0);
+  const ITEMS_PER_PAGE = 8;
+  const MAX_ITEMS = 100;
+
+  // Don't render sidebar on tablet and mobile screens
+  if (width < 1200) {
+    return null;
+  }
 
   useEffect(() => {
-    loadSidebarData();
+    loadSidebarMovies();
   }, []);
 
-  const loadSidebarData = async () => {
+  const loadSidebarMovies = async () => {
     try {
       setLoading(true);
-      const [popularData, topRatedData] = await Promise.all([
-        movieAPI.getPopular(),
-        movieAPI.getTopRated()
+      // Load multiple pages to get 100 items
+      const [popularData, topRatedData, popularData2, topRatedData2, popularData3, topRatedData3] = await Promise.all([
+        movieAPI.getPopular(1),
+        movieAPI.getTopRated(1),
+        movieAPI.getPopular(2),
+        movieAPI.getTopRated(2),
+        movieAPI.getPopular(3),
+        movieAPI.getTopRated(3)
       ]);
-
-      // Most viewed = popular movies (first 8)
-      setMostViewed((popularData.results || popularData).slice(0, 8));
-      // Recommended = top rated movies (first 8)
-      setRecommended((topRatedData.results || topRatedData).slice(0, 8));
+      
+      const allPopular = [
+        ...(popularData.results || []),
+        ...(popularData2.results || []),
+        ...(popularData3.results || [])
+      ].slice(0, MAX_ITEMS);
+      
+      const allTopRated = [
+        ...(topRatedData.results || []),
+        ...(topRatedData2.results || []),
+        ...(topRatedData3.results || [])
+      ].slice(0, MAX_ITEMS);
+      
+      setMostViewed(allPopular);
+      setRecommended(allTopRated);
     } catch (error) {
-      console.error('Error loading sidebar data:', error);
+      console.error('Error loading sidebar movies:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const navigateToMovie = (movieId: number) => {
+  };  const navigateToMovie = (movieId: number) => {
     router.push(`/modal?id=${movieId}`);
   };
 
   const handleViewMoreMostViewed = () => {
-    router.push('/(tabs)/movies?category=Popular');
+    const nextIndex = viewedStartIndex + ITEMS_PER_PAGE;
+    if (nextIndex < mostViewed.length) {
+      setViewedStartIndex(nextIndex);
+    } else {
+      setViewedStartIndex(0); // Reset to beginning
+    }
   };
 
   const handleViewMoreRecommended = () => {
-    router.push('/(tabs)/movies?category=Latest');
+    const nextIndex = recommendedStartIndex + ITEMS_PER_PAGE;
+    if (nextIndex < recommended.length) {
+      setRecommendedStartIndex(nextIndex);
+    } else {
+      setRecommendedStartIndex(0); // Reset to beginning
+    }
+  };
+
+  const handleViewLessMostViewed = () => {
+    const prevIndex = viewedStartIndex - ITEMS_PER_PAGE;
+    setViewedStartIndex(prevIndex >= 0 ? prevIndex : Math.max(0, mostViewed.length - ITEMS_PER_PAGE));
+  };
+
+  const handleViewLessRecommended = () => {
+    const prevIndex = recommendedStartIndex - ITEMS_PER_PAGE;
+    setRecommendedStartIndex(prevIndex >= 0 ? prevIndex : Math.max(0, recommended.length - ITEMS_PER_PAGE));
   };
 
   const renderSidebarMovie = (item: Movie, index: number, section: 'viewed' | 'recommended') => (
@@ -116,20 +169,35 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
           <Ionicons name="eye" size={20} color="#00d4aa" />
           <Text style={styles.sidebarTitle}>Most Viewed</Text>
         </View>
-        <ScrollView 
-          style={styles.moviesContainer}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        >
-          {mostViewed.map((item, index) => renderSidebarMovie(item, index, 'viewed'))}
-        </ScrollView>
-        <TouchableOpacity 
-          style={styles.viewMoreButton}
-          onPress={handleViewMoreMostViewed}
-        >
-          <Text style={styles.viewMoreText}>View More</Text>
-          <Ionicons name="chevron-forward" size={16} color="#00d4aa" />
-        </TouchableOpacity>
+        <View style={styles.moviesContainer}>
+          <Text style={styles.pageIndicator}>
+            {viewedStartIndex + 1}-{Math.min(viewedStartIndex + ITEMS_PER_PAGE, mostViewed.length)} of {mostViewed.length}
+          </Text>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            {mostViewed.slice(viewedStartIndex, viewedStartIndex + ITEMS_PER_PAGE).map((item, index) => 
+              renderSidebarMovie(item, viewedStartIndex + index, 'viewed')
+            )}
+          </ScrollView>
+        </View>
+        <View style={styles.navigationButtons}>
+          <TouchableOpacity 
+            style={[styles.navButton, viewedStartIndex === 0 && styles.disabledButton]}
+            onPress={handleViewLessMostViewed}
+            disabled={viewedStartIndex === 0}
+          >
+            <Ionicons name="chevron-up" size={16} color={viewedStartIndex === 0 ? '#666' : '#00d4aa'} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navButton, (viewedStartIndex + ITEMS_PER_PAGE >= mostViewed.length) && styles.disabledButton]}
+            onPress={handleViewMoreMostViewed}
+            disabled={viewedStartIndex + ITEMS_PER_PAGE >= mostViewed.length}
+          >
+            <Ionicons name="chevron-down" size={16} color={(viewedStartIndex + ITEMS_PER_PAGE >= mostViewed.length) ? '#666' : '#00d4aa'} />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       {/* Recommended Section */}
@@ -141,20 +209,35 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
           <Ionicons name="thumbs-up" size={20} color="#FFD700" />
           <Text style={styles.sidebarTitle}>Recommended</Text>
         </View>
-        <ScrollView 
-          style={styles.moviesContainer}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        >
-          {recommended.map((item, index) => renderSidebarMovie(item, index, 'recommended'))}
-        </ScrollView>
-        <TouchableOpacity 
-          style={styles.viewMoreButton}
-          onPress={handleViewMoreRecommended}
-        >
-          <Text style={styles.viewMoreText}>View More</Text>
-          <Ionicons name="chevron-forward" size={16} color="#FFD700" />
-        </TouchableOpacity>
+        <View style={styles.moviesContainer}>
+          <Text style={styles.pageIndicator}>
+            {recommendedStartIndex + 1}-{Math.min(recommendedStartIndex + ITEMS_PER_PAGE, recommended.length)} of {recommended.length}
+          </Text>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            {recommended.slice(recommendedStartIndex, recommendedStartIndex + ITEMS_PER_PAGE).map((item, index) => 
+              renderSidebarMovie(item, recommendedStartIndex + index, 'recommended')
+            )}
+          </ScrollView>
+        </View>
+        <View style={styles.navigationButtons}>
+          <TouchableOpacity 
+            style={[styles.navButton, recommendedStartIndex === 0 && styles.disabledButton]}
+            onPress={handleViewLessRecommended}
+            disabled={recommendedStartIndex === 0}
+          >
+            <Ionicons name="chevron-up" size={16} color={recommendedStartIndex === 0 ? '#666' : '#FFD700'} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navButton, (recommendedStartIndex + ITEMS_PER_PAGE >= recommended.length) && styles.disabledButton]}
+            onPress={handleViewMoreRecommended}
+            disabled={recommendedStartIndex + ITEMS_PER_PAGE >= recommended.length}
+          >
+            <Ionicons name="chevron-down" size={16} color={(recommendedStartIndex + ITEMS_PER_PAGE >= recommended.length) ? '#666' : '#FFD700'} />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
     </ScrollView>
   );
@@ -162,13 +245,16 @@ export function Sidebar({ isVisible = true }: SidebarProps) {
 
 const styles = StyleSheet.create({
   sidebar: {
-    maxWidth: 230,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    paddingVertical: 1,
-    paddingHorizontal: 2,
+    width: 280,
+    minWidth: 280,
+    maxWidth: 280,
+    backgroundColor: '#0a0a0a',
+    paddingVertical: 20,
+    paddingHorizontal: 15,
     borderLeftWidth: 1,
-    borderLeftColor: 'rgba(0, 212, 170, 0.2)',
+    borderLeftColor: 'rgba(0, 212, 170, 0.1)',
     maxHeight: '100%',
+    flexShrink: 0,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -284,5 +370,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginRight: 5,
+  },
+  pageIndicator: {
+    color: '#888',
+    fontSize: 10,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  navButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 8,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
 });

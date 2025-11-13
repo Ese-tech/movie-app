@@ -22,10 +22,10 @@ import { Sidebar } from '../../components/Sidebar';
 import { TrailerModal } from '../../components/TrailerModal';
 import { UniversalHero } from '../../components/UniversalHero';
 import { useAuth } from '../../context/AuthContext';
-import { Movie, TVShow } from '../../types';
 import {
   tvAPI
 } from '../../src/api/tmdbApi';
+import { TVShow } from '../../types';
 
 const { width } = Dimensions.get('window');
 const categories = ['Popular', 'Top Rated', 'On The Air', 'Airing Today'];
@@ -232,19 +232,20 @@ export default function TVSeriesScreen() {
               <Text style={styles.loadingText}>Loading TV shows...</Text>
             </View>
           ) : (
-            <>
+                          <>
               <FlatList
                 data={tvShows}
                 renderItem={renderShowCard}
                 keyExtractor={(item) => item.id.toString()}
-                numColumns={4}
+                numColumns={width > 1200 ? 4 : width > 768 ? 3 : 2}
+                key={`tvshows-${width > 1200 ? 4 : width > 768 ? 3 : 2}`}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.showsList}
                 columnWrapperStyle={styles.row}
               />
               
-              {/* View More / Show Less Button - Full width like the image */}
-              {!searchQuery && allShows.length > INITIAL_LOAD && (
+              {/* View More / Show Less Button */}
+              {allShows.length > INITIAL_LOAD && (
                 !showingAll ? (
                   <TouchableOpacity style={styles.fullWidthViewMoreButton} onPress={handleViewMore}>
                     <Text style={styles.fullWidthViewMoreText}>
@@ -266,8 +267,8 @@ export default function TVSeriesScreen() {
           <Footer />
         </ScrollView>
 
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Sidebar - only show on large screens */}
+        {width >= 1200 && <Sidebar />}
       </View>
       
       {/* Trailer Modal */}
@@ -294,6 +295,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 0,
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   showCardWrapper: {
-    width: 280,
+    width: width > 1200 ? 280 : width > 768 ? 240 : width * 0.45,
     marginVertical: 8,
   },
   loadingContainer: {

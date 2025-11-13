@@ -2,30 +2,30 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { HorizontalMovieCarousel } from '../../components/HorizontalMovieCarousel';
 import { Sidebar } from '../../components/Sidebar';
 import { TrailerModal } from '../../components/TrailerModal';
 import { useAuth } from '../../context/AuthContext';
-import { Movie } from '../../types';
 import {
-  trendingAPI,
-  movieAPI,
-  getMultiplePagesTrending,
-  getMultiplePagesPopular,
-  getMultiplePagesTopRated,
-  getMultiplePagesUpcoming
+    getMultiplePagesPopular,
+    getMultiplePagesTopRated,
+    getMultiplePagesTrending,
+    getMultiplePagesUpcoming,
+    movieAPI,
+    trendingAPI
 } from '../../src/api/tmdbApi';
+import { Movie } from '../../types';
 
 const { width } = Dimensions.get('window');
 
@@ -326,6 +326,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minWidth: 0,
   },
   loadingContainer: {
     flex: 1,

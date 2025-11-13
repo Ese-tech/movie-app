@@ -9,9 +9,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { TrailerModal } from './TrailerModal';
-import { Movie } from '../types';
 import { trendingAPI } from '../src/api/tmdbApi';
+import { Movie } from '../types';
+import { TrailerModal } from './TrailerModal';
 
 const { width } = Dimensions.get('window');
 
@@ -125,8 +125,8 @@ export const UniversalHero: React.FC<UniversalHeroProps> = ({
 
 const styles = StyleSheet.create({
   heroSection: {
-    height: 300,
-    margin: 16,
+    height: width > 768 ? 300 : 250,
+    margin: width > 768 ? 16 : 8,
     marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
@@ -156,13 +156,13 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+    bottom: width > 768 ? 20 : 15,
+    left: width > 768 ? 20 : 15,
+    right: width > 768 ? 20 : 15,
     zIndex: 2,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: width > 768 ? 24 : 20,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
