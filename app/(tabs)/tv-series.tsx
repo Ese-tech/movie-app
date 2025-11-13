@@ -3,17 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { Footer } from '../../components/Footer';
 import { Header } from '../../components/Header';
@@ -23,7 +23,7 @@ import { TrailerModal } from '../../components/TrailerModal';
 import { UniversalHero } from '../../components/UniversalHero';
 import { useAuth } from '../../context/AuthContext';
 import {
-  tvAPI
+    tvAPI
 } from '../../src/api/tmdbApi';
 import { TVShow } from '../../types';
 
@@ -268,7 +268,7 @@ export default function TVSeriesScreen() {
         </ScrollView>
 
         {/* Sidebar - only show on large screens */}
-        {width >= 1200 && <Sidebar />}
+        {width >= 1200 && <Sidebar width={width} />}
       </View>
       
       {/* Trailer Modal */}

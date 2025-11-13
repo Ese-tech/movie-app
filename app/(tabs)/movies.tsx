@@ -429,7 +429,7 @@ export default function MoviesScreen() {
         </ScrollView>
 
         {/* Sidebar - only show on large screens */}
-        {width >= 1200 && <Sidebar  />}
+        {width >= 1200 && <Sidebar width={width} />}
       </View>
       
       {/* Trailer Modal */}
