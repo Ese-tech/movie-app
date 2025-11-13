@@ -31,7 +31,10 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.development
+.env.production
 
 # typescript
 *.tsbuildinfo
@@ -40,3 +43,38 @@ yarn-error.*
 /ios
 /android
 .vercel
+
+# Documentation files (keep only README.md)
+COMPLETE_IMPLEMENTATION_SUMMARY.md
+DEPLOYMENT_GUIDE.md
+DEPLOYMENT_SUCCESS.md
+ENVIRONMENT_SETUP.md
+IMPLEMENTATION_SUMMARY.md
+UNIVERSAL_HERO_IMPLEMENTATION.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Temporary folders
+tmp/
+temp/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
